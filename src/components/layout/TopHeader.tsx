@@ -7,23 +7,32 @@ import {
   ShieldCheck,
   Stethoscope,
   UserCog,
+  Globe,
   Sparkles,
   LucideIcon,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 
 interface TopHeaderProps {
   onQuickBook: () => void;
+  onViewLandingPage?: () => void;
+  onSignOut?: () => void;
 }
 
-export const TopHeader: React.FC<TopHeaderProps> = ({ onQuickBook }) => {
+export const TopHeader: React.FC<TopHeaderProps> = ({
+  onQuickBook,
+  onViewLandingPage,
+  onSignOut,
+}) => {
   const {
     currentUser,
     currentTenant,
     allTenants,
     switchRole,
     switchTenant,
+    logout,
   } = useAuth();
 
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
@@ -111,6 +120,36 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onQuickBook }) => {
             <span className="hidden sm:inline">Book Appointment</span>
           </button>
         )}
+
+        {/* Landing Page Trigger */}
+        {onViewLandingPage && (
+          <button
+            onClick={onViewLandingPage}
+            className="flex items-center space-x-1.5 bg-surface-100 hover:bg-surface-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold border border-border transition-colors"
+            title="View Public Landing Page"
+          >
+            <Globe size={14} className="text-primary-600" />
+            <span className="hidden sm:inline">Landing Page</span>
+          </button>
+        )}
+
+        {/* Powered by Axiotronicx Tag */}
+        <div className="hidden xl:flex items-center px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          Powered by Axiotronicx.Inc
+        </div>
+
+        {/* Sign Out Trigger */}
+        <button
+          onClick={() => {
+            logout();
+            if (onSignOut) onSignOut();
+          }}
+          className="flex items-center space-x-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all border border-transparent hover:border-rose-200"
+          title="Sign Out"
+        >
+          <LogOut size={15} />
+          <span className="hidden md:inline">Sign Out</span>
+        </button>
 
         {/* Notification Bell */}
         <div className="relative">

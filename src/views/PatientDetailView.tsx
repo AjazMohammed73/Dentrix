@@ -19,6 +19,7 @@ import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { AddClinicalNoteModal } from '../components/modals/AddClinicalNoteModal';
+import { formatINR, formatINRCurrency } from '../utils/format';
 
 interface PatientDetailViewProps {
   patientId: string;
@@ -54,6 +55,7 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
   const patientInvoices = invoices.filter((i) => i.patientId === patient.id);
 
   const canWriteNotes = currentUser.permissions.canWriteDoctorNotes || currentUser.role === 'DOCTOR_ADMIN';
+  const canViewRevenue = currentUser.permissions.canViewRevenue || currentUser.role === 'DOCTOR_ADMIN' || currentUser.role === 'SUPER_ADMIN';
 
   // Teeth 1 to 32
   const upperTeeth = Array.from({ length: 16 }, (_, i) => i + 1); // 1-16
@@ -126,18 +128,20 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
 
           {/* Quick Balance & Insurance pills */}
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-surface-50 border border-border rounded-2xl text-right">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                Account Balance
-              </span>
-              <span
-                className={`text-lg font-black ${
-                  patient.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
-                }`}
-              >
-                ${patient.balance.toFixed(2)}
-              </span>
-            </div>
+            {canViewRevenue && (
+              <div className="p-3 bg-surface-50 border border-border rounded-2xl text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                  Account Balance
+                </span>
+                <span
+                  className={`text-lg font-black ${
+                    patient.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                  }`}
+                >
+                  {formatINR(patient.balance)}
+                </span>
+              </div>
+            )}
 
             <div className="p-3 bg-primary-50/60 border border-primary-100 rounded-2xl max-w-[200px]">
               <span className="text-[10px] uppercase font-bold text-primary-700 block flex items-center gap-1">
@@ -174,11 +178,13 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
       {/* Tabs Navigation */}
       <div className="flex items-center space-x-2 border-b border-border">
         {[
-          { id: 'notes', label: 'Doctor Clinical Notes', icon: FileText, count: patientNotes.length },
-          { id: 'chart', label: 'Odontogram / Dental Chart', icon: Smile },
-          { id: 'appointments', label: 'Visit History', icon: Calendar, count: patientAppointments.length },
-          { id: 'billing', label: 'Billing & Invoices', icon: DollarSign, count: patientInvoices.length },
-        ].map((tab) => {
+          { id: 'notes', label: 'Doctor Clinical Notes', icon: FileText, count: patientNotes.length, visible: true },
+          { id: 'chart', label: 'Odontogram / Dental Chart', icon: Smile, visible: true },
+          { id: 'appointments', label: 'Visit History', icon: Calendar, count: patientAppointments.length, visible: true },
+          { id: 'billing', label: 'Billing & Invoices', icon: DollarSign, count: patientInvoices.length, visible: canViewRevenue },
+        ]
+          .filter((t) => t.visible)
+          .map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
@@ -471,9 +477,9 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
                       {inv.invoiceNumber}
                     </td>
                     <td className="py-3 px-4 text-slate-800">{inv.serviceName}</td>
-                    <td className="py-3 px-4 font-bold text-slate-900">${inv.amount}</td>
-                    <td className="py-3 px-4 text-emerald-600 font-semibold">${inv.amountPaid}</td>
-                    <td className="py-3 px-4 font-bold text-rose-600">${inv.balance}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900">{formatINR(inv.amount)}</td>
+                    <td className="py-3 px-4 text-emerald-600 font-semibold">{formatINR(inv.amountPaid)}</td>
+                    <td className="py-3 px-4 font-bold text-rose-600">{formatINR(inv.balance)}</td>
                     <td className="py-3 px-4">
                       <Badge
                         variant={

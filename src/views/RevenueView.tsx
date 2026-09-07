@@ -14,10 +14,31 @@ import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { InvoiceStatus } from '../types';
+import { formatINR } from '../utils/format';
+import { AccessDeniedView } from './AccessDeniedView';
 
-export const RevenueView: React.FC = () => {
+interface RevenueViewProps {
+  onNavigateHome?: () => void;
+}
+
+export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
   const { invoices, appointments, markInvoicePaid } = useData();
   const { currentUser, currentTenant } = useAuth();
+
+  const canViewRevenue =
+    currentUser.permissions.canViewRevenue ||
+    currentUser.role === 'DOCTOR_ADMIN' ||
+    currentUser.role === 'SUPER_ADMIN';
+
+  if (!canViewRevenue) {
+    return (
+      <AccessDeniedView
+        attemptedRoute="revenue"
+        requiredRoleOrPermission="Revenue Reports Permission (canViewRevenue) or Doctor Admin"
+        onNavigateHome={onNavigateHome || (() => {})}
+      />
+    );
+  }
 
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,25 +62,25 @@ export const RevenueView: React.FC = () => {
   const collectionRate =
     totalGrossBilled > 0 ? Math.round((totalCollected / totalGrossBilled) * 100) : 100;
 
-  // Monthly breakdown mock data for chart
+  // Monthly breakdown mock data for chart (in INR)
   const monthlyData = [
-    { month: 'Apr', billed: 14200, collected: 13800 },
-    { month: 'May', billed: 16500, collected: 15900 },
-    { month: 'Jun', billed: 18900, collected: 17400 },
-    { month: 'Jul', billed: 21300, collected: 20100 },
-    { month: 'Aug', billed: 24800, collected: 23200 },
-    { month: 'Sep (Current)', billed: 27400, collected: 25100 },
+    { month: 'Apr', billed: 142000, collected: 138000 },
+    { month: 'May', billed: 165000, collected: 159000 },
+    { month: 'Jun', billed: 189000, collected: 174000 },
+    { month: 'Jul', billed: 213000, collected: 201000 },
+    { month: 'Aug', billed: 248000, collected: 232000 },
+    { month: 'Sep (Current)', billed: 274000, collected: 251000 },
   ];
 
   const maxMonthVal = Math.max(...monthlyData.map((m) => m.billed));
 
-  // Service breakdown
+  // Service breakdown (in INR)
   const serviceCategories = [
-    { category: 'Restorative (Crowns & Fillings)', amount: 12400, pct: 45, color: 'bg-primary-600' },
-    { category: 'Endodontics (Root Canals)', amount: 6200, pct: 23, color: 'bg-indigo-600' },
-    { category: 'Preventive & Hygiene Cleanings', amount: 4800, pct: 18, color: 'bg-emerald-600' },
-    { category: 'Periodontics & Scaling', amount: 2400, pct: 9, color: 'bg-amber-600' },
-    { category: 'Oral Surgery & Consultations', amount: 1600, pct: 5, color: 'bg-sky-600' },
+    { category: 'Restorative (Crowns & Fillings)', amount: 124000, pct: 45, color: 'bg-primary-600' },
+    { category: 'Endodontics (Root Canals)', amount: 62000, pct: 23, color: 'bg-indigo-600' },
+    { category: 'Preventive & Hygiene Cleanings', amount: 48000, pct: 18, color: 'bg-emerald-600' },
+    { category: 'Periodontics & Scaling', amount: 24000, pct: 9, color: 'bg-amber-600' },
+    { category: 'Oral Surgery & Consultations', amount: 16000, pct: 5, color: 'bg-sky-600' },
   ];
 
   const filteredInvoices = invoices.filter((i) => {
@@ -123,7 +144,7 @@ export const RevenueView: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           title="Today's Production Billed"
-          value={`$${totalBilledToday.toLocaleString()}`}
+          value={formatINR(totalBilledToday)}
           subtitle={`${todaysAppointments.length} procedures today`}
           icon={Calendar}
           iconBgColor="bg-primary-50"
@@ -131,7 +152,7 @@ export const RevenueView: React.FC = () => {
         />
         <StatCard
           title="Total Collections Received"
-          value={`$${totalCollected.toLocaleString()}`}
+          value={formatINR(totalCollected)}
           trend={{ value: '14.2%', isPositive: true }}
           icon={TrendingUp}
           iconBgColor="bg-emerald-50"
@@ -139,7 +160,7 @@ export const RevenueView: React.FC = () => {
         />
         <StatCard
           title="Pending Accounts Receivable"
-          value={`$${totalPending.toLocaleString()}`}
+          value={formatINR(totalPending)}
           subtitle="Awaiting patient or insurance"
           icon={AlertCircle}
           iconBgColor="bg-amber-50"
@@ -190,13 +211,13 @@ export const RevenueView: React.FC = () => {
                     <div
                       className="w-5 bg-primary-600 rounded-t-lg transition-all duration-300 group-hover:brightness-110 relative"
                       style={{ height: `${billedHeight}%` }}
-                      title={`Billed: $${d.billed}`}
+                      title={`Billed: ${formatINR(d.billed)}`}
                     />
                     {/* Collected Bar */}
                     <div
                       className="w-5 bg-emerald-500 rounded-t-lg transition-all duration-300 group-hover:brightness-110 relative"
                       style={{ height: `${collectedHeight}%` }}
-                      title={`Collected: $${d.collected}`}
+                      title={`Collected: ${formatINR(d.collected)}`}
                     />
                   </div>
                   <span className="text-[11px] font-bold text-slate-600 truncate max-w-[65px]">
@@ -208,7 +229,7 @@ export const RevenueView: React.FC = () => {
           </div>
           <div className="pt-3 flex items-center justify-between text-xs text-slate-500">
             <span>Average monthly growth: +9.6%</span>
-            <span className="font-bold text-slate-900">Current Month: $27,400</span>
+            <span className="font-bold text-slate-900">Current Month: {formatINR(274000)}</span>
           </div>
         </div>
 
@@ -225,7 +246,7 @@ export const RevenueView: React.FC = () => {
                 <div key={item.category} className="space-y-1">
                   <div className="flex items-center justify-between text-xs font-semibold">
                     <span className="text-slate-700 truncate pr-2">{item.category}</span>
-                    <span className="text-slate-900 font-bold">${item.amount.toLocaleString()}</span>
+                    <span className="text-slate-900 font-bold">{formatINR(item.amount)}</span>
                   </div>
                   <div className="w-full h-2 bg-surface-100 rounded-full overflow-hidden">
                     <div
@@ -294,9 +315,9 @@ export const RevenueView: React.FC = () => {
                   </td>
                   <td className="py-3.5 px-4 font-bold text-slate-800">{inv.patientName}</td>
                   <td className="py-3.5 px-4 text-slate-600">{inv.serviceName}</td>
-                  <td className="py-3.5 px-4 font-bold text-slate-900">${inv.amount}</td>
-                  <td className="py-3.5 px-4 text-emerald-600 font-semibold">${inv.amountPaid}</td>
-                  <td className="py-3.5 px-4 font-bold text-rose-600">${inv.balance}</td>
+                  <td className="py-3.5 px-4 font-bold text-slate-900">{formatINR(inv.amount)}</td>
+                  <td className="py-3.5 px-4 text-emerald-600 font-semibold">{formatINR(inv.amountPaid)}</td>
+                  <td className="py-3.5 px-4 font-bold text-rose-600">{formatINR(inv.balance)}</td>
                   <td className="py-3.5 px-4 text-slate-500 font-mono">{inv.date}</td>
                   <td className="py-3.5 px-4">
                     <Badge

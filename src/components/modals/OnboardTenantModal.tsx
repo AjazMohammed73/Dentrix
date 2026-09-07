@@ -50,6 +50,15 @@ export const OnboardTenantModal: React.FC<OnboardTenantModalProps> = ({ isOpen, 
       doctorAdminEmail: doctorEmail.trim(),
       storageMb: 120,
       plan,
+      subscription: {
+        plan,
+        status: 'Active',
+        billingCycle: 'Monthly',
+        monthlyFee: plan === 'Starter' ? 7999 : plan === 'Professional' ? 15999 : 31999,
+        chairLimit: plan === 'Starter' ? 2 : plan === 'Professional' ? 6 : 15,
+        renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        autoRenew: true,
+      },
       createdAt: new Date().toISOString().split('T')[0],
     };
 

@@ -9,6 +9,16 @@ export interface UserPermissions {
   canManageStaff: boolean;
 }
 
+export interface TenantSubscription {
+  plan: 'Starter' | 'Professional' | 'Enterprise';
+  status: 'Active' | 'Trial' | 'Past Due' | 'Cancelled';
+  billingCycle: 'Monthly' | 'Annual';
+  monthlyFee: number;
+  chairLimit: number;
+  renewalDate: string;
+  autoRenew: boolean;
+}
+
 export interface ClinicTenant {
   id: string;
   name: string;
@@ -21,6 +31,7 @@ export interface ClinicTenant {
   doctorAdminEmail: string;
   storageMb: number;
   plan: 'Starter' | 'Professional' | 'Enterprise';
+  subscription: TenantSubscription;
   createdAt: string;
 }
 
@@ -34,7 +45,7 @@ export interface User {
   phone?: string;
   avatar?: string;
   permissions: UserPermissions;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'suspended';
   joinedAt: string;
 }
 

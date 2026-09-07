@@ -13,14 +13,32 @@ import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { ServiceCategory, DentalService } from '../types';
+import { formatINR } from '../utils/format';
+import { AccessDeniedView } from './AccessDeniedView';
 
 interface ServicesViewProps {
   onOpenAddService: () => void;
+  onNavigateHome?: () => void;
 }
 
-export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenAddService }) => {
+export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenAddService, onNavigateHome }) => {
   const { services, toggleServiceActive } = useData();
-  const { currentTenant } = useAuth();
+  const { currentTenant, currentUser } = useAuth();
+
+  const canManageServices =
+    currentUser.permissions.canManageServices ||
+    currentUser.role === 'DOCTOR_ADMIN' ||
+    currentUser.role === 'SUPER_ADMIN';
+
+  if (!canManageServices) {
+    return (
+      <AccessDeniedView
+        attemptedRoute="services"
+        requiredRoleOrPermission="Services Catalog Management (canManageServices) or Doctor Admin"
+        onNavigateHome={onNavigateHome || (() => {})}
+      />
+    );
+  }
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -148,7 +166,7 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenAddService }) 
 
                   <td className="py-4 px-5">
                     <span className="font-black text-sm text-slate-900">
-                      ${service.basePrice.toLocaleString()}
+                      {formatINR(service.basePrice)}
                     </span>
                   </td>
 

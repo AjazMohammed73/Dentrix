@@ -13,6 +13,7 @@ import { RevenueView } from './views/RevenueView';
 import { StaffView } from './views/StaffView';
 import { ServicesView } from './views/ServicesView';
 import { SuperAdminView } from './views/SuperAdminView';
+import { LandingPageView } from './views/LandingPageView';
 
 // Modals
 import { BookAppointmentModal } from './components/modals/BookAppointmentModal';
@@ -20,9 +21,12 @@ import { AddPatientModal } from './components/modals/AddPatientModal';
 import { AddServiceModal } from './components/modals/AddServiceModal';
 import { AddStaffModal } from './components/modals/AddStaffModal';
 import { OnboardTenantModal } from './components/modals/OnboardTenantModal';
+import { SignInModal } from './components/modals/SignInModal';
 
 const AppContent: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated } = useAuth();
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(true);
+  const [isSignInOpen, setIsSignInOpen] = useState<boolean>(false);
   const [currentRoute, setCurrentRoute] = useState<NavRoute>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
@@ -53,18 +57,54 @@ const AppContent: React.FC = () => {
     setSelectedPatientId(null);
   };
 
+  const handleLaunchApp = () => {
+    if (!isAuthenticated) {
+      setIsSignInOpen(true);
+    } else {
+      setShowLandingPage(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    setShowLandingPage(true);
+  };
+
+  if (showLandingPage) {
+    return (
+      <>
+        <LandingPageView
+          onLaunchApp={handleLaunchApp}
+          onOpenSignIn={() => setIsSignInOpen(true)}
+        />
+        <SignInModal
+          isOpen={isSignInOpen}
+          onClose={() => setIsSignInOpen(false)}
+          onSuccess={() => {
+            setIsSignInOpen(false);
+            setShowLandingPage(false);
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] text-slate-800">
       {/* Persistent Left Sidebar */}
       <Sidebar
         currentRoute={currentRoute}
         onNavigate={handleNavigate}
+        onSignOut={handleSignOut}
       />
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header */}
-        <TopHeader onQuickBook={handleQuickBook} />
+        <TopHeader
+          onQuickBook={handleQuickBook}
+          onViewLandingPage={() => setShowLandingPage(true)}
+          onSignOut={handleSignOut}
+        />
 
         {/* Dynamic Route Content */}
         <main className="flex-1 overflow-y-auto">
@@ -99,18 +139,29 @@ const AppContent: React.FC = () => {
                 />
               )}
 
-              {currentRoute === 'revenue' && <RevenueView />}
+              {currentRoute === 'revenue' && (
+                <RevenueView onNavigateHome={() => handleNavigate('dashboard')} />
+              )}
 
               {currentRoute === 'staff' && (
-                <StaffView onOpenAddStaff={() => setIsAddStaffOpen(true)} />
+                <StaffView
+                  onOpenAddStaff={() => setIsAddStaffOpen(true)}
+                  onNavigateHome={() => handleNavigate('dashboard')}
+                />
               )}
 
               {currentRoute === 'services' && (
-                <ServicesView onOpenAddService={() => setIsAddServiceOpen(true)} />
+                <ServicesView
+                  onOpenAddService={() => setIsAddServiceOpen(true)}
+                  onNavigateHome={() => handleNavigate('dashboard')}
+                />
               )}
 
               {currentRoute === 'tenants' && (
-                <SuperAdminView onOpenOnboardModal={() => setIsOnboardTenantOpen(true)} />
+                <SuperAdminView
+                  onOpenOnboardModal={() => setIsOnboardTenantOpen(true)}
+                  onNavigateHome={() => handleNavigate('dashboard')}
+                />
               )}
             </>
           )}
@@ -118,6 +169,11 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* Global Modals */}
+      <SignInModal
+        isOpen={isSignInOpen}
+        onClose={() => setIsSignInOpen(false)}
+        onSuccess={() => setIsSignInOpen(false)}
+      />
       <BookAppointmentModal
         isOpen={isBookModalOpen}
         onClose={() => setIsBookModalOpen(false)}

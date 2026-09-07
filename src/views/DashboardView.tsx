@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { NavRoute } from '../components/layout/Sidebar';
 import { AppointmentStatus } from '../types';
+import { formatINR } from '../utils/format';
 
 interface DashboardViewProps {
   onNavigate: (route: NavRoute) => void;
@@ -265,7 +266,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <>
             <StatCard
               title="Today's Billed Production"
-              value={`$${totalBilledToday.toLocaleString()}`}
+              value={formatINR(totalBilledToday)}
               subtitle="Mapped from CDT service fees"
               icon={DollarSign}
               iconBgColor="bg-sky-50"
@@ -274,8 +275,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             />
             <StatCard
               title="Monthly Collections"
-              value={`$${totalCollectedMonth.toLocaleString()}`}
-              subtitle={`Pending balance: $${totalPendingBalance.toLocaleString()}`}
+              value={formatINR(totalCollectedMonth)}
+              subtitle={`Pending balance: ${formatINR(totalPendingBalance)}`}
               trend={{ value: '8.4%', isPositive: true }}
               icon={TrendingUp}
               iconBgColor="bg-amber-50"

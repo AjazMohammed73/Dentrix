@@ -3,6 +3,7 @@ import { X, Calendar, Clock, User, Stethoscope, Armchair, DollarSign } from 'luc
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { OperatoryChair } from '../../types';
+import { formatINR } from '../../utils/format';
 
 interface BookAppointmentModalProps {
   isOpen: boolean;
@@ -140,9 +141,8 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
                 <span>
                   <strong>Standard Duration:</strong> {selectedService.durationMinutes} min
                 </span>
-                <span className="font-bold flex items-center">
-                  <DollarSign size={13} className="-mr-0.5" />
-                  {selectedService.basePrice}
+                <span className="font-bold">
+                  {formatINR(selectedService.basePrice)}
                 </span>
               </div>
             )}

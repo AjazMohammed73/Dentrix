@@ -15,7 +15,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClos
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ServiceCategory>('Preventive');
   const [durationMinutes, setDurationMinutes] = useState(45);
-  const [basePrice, setBasePrice] = useState(120);
+  const [basePrice, setBasePrice] = useState(1500);
   const [description, setDescription] = useState('');
 
   if (!isOpen) return null;
@@ -134,7 +134,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({ isOpen, onClos
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <DollarSign size={13} className="text-slate-500" /> Base Price ($ USD)
+                <DollarSign size={13} className="text-slate-500" /> Base Price (₹ INR)
               </label>
               <input
                 type="number"

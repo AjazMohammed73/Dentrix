@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  LogOut,
 } from 'lucide-react';
 import { Tooth3D } from './Tooth3D';
 import { useAuth } from '../../context/AuthContext';
@@ -27,11 +28,12 @@ export type NavRoute =
 interface SidebarProps {
   currentRoute: NavRoute;
   onNavigate: (route: NavRoute) => void;
+  onSignOut?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSignOut }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const { currentUser, currentTenant } = useAuth();
+  const { currentUser, currentTenant, logout } = useAuth();
   const { appointments, patients } = useData();
 
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
@@ -228,9 +230,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate }) =>
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-slate-900 truncate">
-                {currentUser.name}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-900 truncate">
+                  {currentUser.name}
+                </p>
+                <button
+                  onClick={() => {
+                    logout();
+                    if (onSignOut) onSignOut();
+                  }}
+                  className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                  title="Sign Out"
+                >
+                  <LogOut size={13} />
+                </button>
+              </div>
               <p className="text-[11px] text-slate-500 truncate">
                 {currentUser.title}
               </p>
@@ -240,6 +254,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate }) =>
             </div>
           )}
         </div>
+
+        {/* Tagline */}
+        {!isCollapsed && (
+          <div className="mt-2.5 pt-2 border-t border-slate-200/60 text-center">
+            <span className="text-[10px] font-bold tracking-wider uppercase text-slate-400 hover:text-primary-700 transition-colors cursor-default">
+              ⚡ Powered by Axiotronicx.Inc
+            </span>
+          </div>
+        )}
       </div>
     </aside>
   );

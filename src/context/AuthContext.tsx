@@ -7,6 +7,9 @@ interface AuthContextType {
   currentTenant: ClinicTenant | null;
   allTenants: ClinicTenant[];
   allUsers: User[];
+  isAuthenticated: boolean;
+  loginWithEmail: (email: string) => { success: boolean; error?: string };
+  logout: () => void;
   switchRole: (role: UserRole, tenantId?: string) => void;
   switchTenant: (tenantId: string) => void;
   updateUserPermissions: (userId: string, permissions: Partial<UserPermissions>) => void;
@@ -14,6 +17,11 @@ interface AuthContextType {
   toggleTenantStatus: (tenantId: string) => void;
   addStaffMember: (user: Omit<User, 'id' | 'joinedAt'>) => void;
   toggleStaffStatus: (userId: string) => void;
+  deleteStaffMember: (userId: string) => void;
+  updateUser: (userId: string, data: Partial<User>) => void;
+  deleteUserGlobal: (userId: string) => void;
+  assignDoctorAdmin: (tenantId: string, doctorUserId: string) => void;
+  updateTenantSubscription: (tenantId: string, subscription: ClinicTenant['subscription']) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +35,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [allUsers, setAllUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem('dentrix_users');
     return saved ? JSON.parse(saved) : initialUsers;
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const authState = localStorage.getItem('dentrix_is_authenticated');
+    return authState !== null ? JSON.parse(authState) : true;
   });
 
   // Default to Doctor Admin of Apex Dental
@@ -50,7 +63,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('dentrix_active_user', JSON.stringify(currentUser));
   }, [currentUser]);
 
+  useEffect(() => {
+    localStorage.setItem('dentrix_is_authenticated', JSON.stringify(isAuthenticated));
+  }, [isAuthenticated]);
+
   const currentTenant = allTenants.find((t) => t.id === currentUser.tenantId) || null;
+
+  const loginWithEmail = (email: string): { success: boolean; error?: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+    const foundUser = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (!foundUser) {
+      return {
+        success: false,
+        error: `No account found associated with "${email}". Please verify the email address or use one of the demo credentials below.`,
+      };
+    }
+
+    if (foundUser.status === 'suspended') {
+      return {
+        success: false,
+        error: `Account for ${foundUser.name} is currently suspended. Please contact a Clinic Administrator or Super Admin.`,
+      };
+    }
+
+    setCurrentUser(foundUser);
+    setIsAuthenticated(true);
+    return { success: true };
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+  };
 
   const switchRole = (role: UserRole, targetTenantId?: string) => {
     const targetTenant = targetTenantId || currentUser.tenantId || 'tenant_apex';
@@ -142,6 +186,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
+  const deleteStaffMember = (userId: string) => {
+    setAllUsers((prev) => prev.filter((u) => u.id !== userId));
+  };
+
+  const updateUser = (userId: string, data: Partial<User>) => {
+    setAllUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, ...data } : u))
+    );
+    if (currentUser.id === userId) {
+      setCurrentUser((prev) => ({ ...prev, ...data }));
+    }
+  };
+
+  const deleteUserGlobal = (userId: string) => {
+    setAllUsers((prev) => prev.filter((u) => u.id !== userId));
+  };
+
+  const assignDoctorAdmin = (tenantId: string, doctorUserId: string) => {
+    const targetUser = allUsers.find((u) => u.id === doctorUserId);
+    if (!targetUser) return;
+
+    // Update clinic tenant record
+    setAllTenants((prev) =>
+      prev.map((t) =>
+        t.id === tenantId
+          ? {
+              ...t,
+              doctorAdminName: targetUser.name,
+              doctorAdminEmail: targetUser.email,
+            }
+          : t
+      )
+    );
+
+    // Promote user to DOCTOR_ADMIN with full permissions for that clinic
+    setAllUsers((prev) =>
+      prev.map((u) =>
+        u.id === doctorUserId
+          ? {
+              ...u,
+              tenantId,
+              role: 'DOCTOR_ADMIN',
+              title: u.title.includes('Doctor') || u.title.includes('DDS') || u.title.includes('DMD') ? u.title : `${u.title} (Doctor Admin)`,
+              permissions: {
+                canManageAppointments: true,
+                canManagePatients: true,
+                canWriteDoctorNotes: true,
+                canViewRevenue: true,
+                canManageServices: true,
+                canManageStaff: true,
+              },
+            }
+          : u
+      )
+    );
+  };
+
+  const updateTenantSubscription = (
+    tenantId: string,
+    subscription: ClinicTenant['subscription']
+  ) => {
+    setAllTenants((prev) =>
+      prev.map((t) =>
+        t.id === tenantId
+          ? {
+              ...t,
+              plan: subscription.plan,
+              subscription,
+            }
+          : t
+      )
+    );
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -149,6 +267,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentTenant,
         allTenants,
         allUsers,
+        isAuthenticated,
+        loginWithEmail,
+        logout,
         switchRole,
         switchTenant,
         updateUserPermissions,
@@ -156,6 +277,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toggleTenantStatus,
         addStaffMember,
         toggleStaffStatus,
+        deleteStaffMember,
+        updateUser,
+        deleteUserGlobal,
+        assignDoctorAdmin,
+        updateTenantSubscription,
       }}
     >
       {children}

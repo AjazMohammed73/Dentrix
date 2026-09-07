@@ -14,6 +14,7 @@ import {
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { OperatoryChair, AppointmentStatus, Appointment } from '../types';
+import { formatINR } from '../utils/format';
 
 interface AppointmentsViewProps {
   onBookAppointment: () => void;
@@ -263,7 +264,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 
                           <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
                             <span className="truncate">Dr: {apt.doctorName}</span>
-                            <span className="font-bold text-slate-800">${apt.fee}</span>
+                            <span className="font-bold text-slate-800">{formatINR(apt.fee)}</span>
                           </div>
 
                           {/* Status changer buttons */}
@@ -377,7 +378,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                   </td>
                   <td className="py-3.5 px-4 text-slate-600">{apt.operatoryChair}</td>
                   <td className="py-3.5 px-4 text-slate-600">{apt.doctorName}</td>
-                  <td className="py-3.5 px-4 font-bold text-slate-900">${apt.fee}</td>
+                  <td className="py-3.5 px-4 font-bold text-slate-900">{formatINR(apt.fee)}</td>
                   <td className="py-3.5 px-4">{getStatusBadge(apt.status)}</td>
                   <td className="py-3.5 px-4">
                     <select

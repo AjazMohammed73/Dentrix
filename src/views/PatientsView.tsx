@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
+import { formatINR } from '../utils/format';
 
 interface PatientsViewProps {
   onSelectPatient: (patientId: string) => void;
@@ -23,6 +25,8 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   onOpenAddPatient,
 }) => {
   const { patients } = useData();
+  const { currentUser } = useAuth();
+  const canViewRevenue = currentUser.permissions.canViewRevenue || currentUser.role === 'DOCTOR_ADMIN' || currentUser.role === 'SUPER_ADMIN';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAlertsOnly, setFilterAlertsOnly] = useState(false);
@@ -98,13 +102,13 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="text-slate-600 bg-surface-50 uppercase tracking-wider font-semibold border-b border-border">
               <tr>
-                <th className="py-3.5 px-5">Patient Name</th>
-                <th className="py-3.5 px-5">Contact Details</th>
-                <th className="py-3.5 px-5">Insurance Coverage</th>
-                <th className="py-3.5 px-5">Medical Alerts & Risk</th>
-                <th className="py-3.5 px-5">Account Balance</th>
-                <th className="py-3.5 px-5">Last Visit</th>
-                <th className="py-3.5 px-5 text-right">Actions</th>
+                <th className="py-3 px-5">Patient Name</th>
+                <th className="py-3 px-5">Contact Details</th>
+                <th className="py-3 px-5">Insurance Payer</th>
+                <th className="py-3 px-5">Medical Alerts</th>
+                {canViewRevenue && <th className="py-3 px-5">Account Balance</th>}
+                <th className="py-3 px-5">Last Visit</th>
+                <th className="py-3 px-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -112,33 +116,23 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                 <tr
                   key={patient.id}
                   onClick={() => onSelectPatient(patient.id)}
-                  className="hover:bg-primary-50/30 cursor-pointer transition-colors group"
+                  className="hover:bg-surface-50/70 cursor-pointer transition-colors group"
                 >
                   <td className="py-4 px-5">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-800 font-bold flex items-center justify-center text-xs shadow-sm">
-                        {patient.firstName[0]}
-                        {patient.lastName[0]}
-                      </div>
-                      <div>
-                        <span className="font-bold text-sm text-slate-900 group-hover:text-primary-600 transition-colors">
-                          {patient.firstName} {patient.lastName}
-                        </span>
-                        <p className="text-[11px] text-slate-500">
-                          DOB: {patient.dateOfBirth} ({patient.gender})
-                        </p>
-                      </div>
+                    <div className="font-bold text-slate-900 group-hover:text-primary-600 transition-colors">
+                      {patient.firstName} {patient.lastName}
                     </div>
+                    <div className="text-[11px] text-slate-400">DOB: {patient.dateOfBirth}</div>
                   </td>
 
-                  <td className="py-4 px-5 text-slate-600 space-y-0.5">
-                    <div className="flex items-center space-x-1.5 text-slate-800 font-medium">
+                  <td className="py-4 px-5 space-y-0.5">
+                    <div className="flex items-center space-x-1.5 text-slate-600">
                       <Phone size={12} className="text-slate-400" />
                       <span>{patient.phone}</span>
                     </div>
-                    <div className="flex items-center space-x-1.5 text-[11px] text-slate-500 truncate max-w-[170px]">
+                    <div className="flex items-center space-x-1.5 text-slate-500 text-[11px]">
                       <Mail size={12} className="text-slate-400" />
-                      <span className="truncate">{patient.email}</span>
+                      <span className="truncate max-w-[160px]">{patient.email}</span>
                     </div>
                   </td>
 
@@ -169,13 +163,15 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                     )}
                   </td>
 
-                  <td className="py-4 px-5 font-semibold">
-                    {patient.balance > 0 ? (
-                      <span className="text-rose-600 font-bold">${patient.balance} Due</span>
-                    ) : (
-                      <span className="text-emerald-600 font-semibold">$0.00 (Current)</span>
-                    )}
-                  </td>
+                  {canViewRevenue && (
+                    <td className="py-4 px-5 font-semibold">
+                      {patient.balance > 0 ? (
+                        <span className="text-rose-600 font-bold">{formatINR(patient.balance)} Due</span>
+                      ) : (
+                        <span className="text-emerald-600 font-semibold">₹0.00 (Current)</span>
+                      )}
+                    </td>
+                  )}
 
                   <td className="py-4 px-5 text-slate-500 font-mono text-[11px]">
                     {patient.lastVisit || 'First Visit'}

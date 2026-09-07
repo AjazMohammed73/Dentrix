@@ -31,6 +31,7 @@ interface DataContextType {
   allPatients: Patient[];
   allAppointments: Appointment[];
   allInvoices: Invoice[];
+  allServices: DentalService[];
 
   // Mutations
   addPatient: (patientData: Omit<Patient, 'id' | 'createdAt' | 'tenantId'>) => Patient;
@@ -253,6 +254,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         allPatients,
         allAppointments,
         allInvoices,
+        allServices,
         addPatient,
         updatePatient,
         addAppointment,
