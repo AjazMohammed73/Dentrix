@@ -63,6 +63,92 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
   const upperTeeth = Array.from({ length: 16 }, (_, i) => i + 1); // 1-16
   const lowerTeeth = Array.from({ length: 16 }, (_, i) => 32 - i); // 32-17
 
+  // Dynamic Odontogram: Derive tooth conditions from clinical progress notes
+  const getToothStatus = (num: number) => {
+    // Check if any clinical note references this tooth number
+    const matchingNotes = patientNotes.filter((n) => {
+      if (n.toothNumbers && n.toothNumbers.includes(num)) return true;
+      if (!n.toothNumber) return false;
+      const parsedNum = n.toothNumber.match(/#(\d+)/);
+      return parsedNum && parseInt(parsedNum[1], 10) === num;
+    });
+
+    if (matchingNotes.length === 0) {
+      // Default initial condition if tooth #19
+      if (num === 19) {
+        return {
+          condition: 'Restored' as const,
+          label: 'Composite Resin Restoration',
+          notes: 'Restored with D2391 Resin Composite (Occlusal). Margin stable, no sensitivity.',
+          surfaces: ['O'] as string[],
+          badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
+          dotColor: 'bg-amber-500',
+        };
+      }
+      return {
+        condition: 'Healthy' as const,
+        label: 'Healthy Dentition',
+        notes: 'Healthy natural dentition; no active caries or existing restorations recorded.',
+        surfaces: undefined as string[] | undefined,
+        badgeColor: 'bg-surface-100 text-slate-700 border-slate-200',
+        dotColor: 'bg-emerald-500',
+      };
+    }
+
+    // Most recent note
+    const latest = matchingNotes[0];
+    const proc = latest.procedureName.toLowerCase();
+    const diag = latest.diagnosis.toLowerCase();
+    const surfaces = latest.toothSurfaces;
+
+    if (proc.includes('crown') || diag.includes('crown')) {
+      return {
+        condition: 'Crown' as const,
+        label: 'Prosthetic Crown',
+        notes: `Treated with ${latest.procedureName} on ${latest.date}. Diagnostic finding: ${latest.diagnosis}`,
+        surfaces,
+        badgeColor: 'bg-purple-100 text-purple-800 border-purple-300',
+        dotColor: 'bg-purple-600',
+      };
+    } else if (proc.includes('canal') || proc.includes('endodontic') || diag.includes('pulp')) {
+      return {
+        condition: 'Endodontic' as const,
+        label: 'Endodontic Therapy',
+        notes: `Treated with ${latest.procedureName} on ${latest.date}. Diagnostic finding: ${latest.diagnosis}`,
+        surfaces,
+        badgeColor: 'bg-rose-100 text-rose-800 border-rose-300',
+        dotColor: 'bg-rose-600',
+      };
+    } else if (proc.includes('extraction') || diag.includes('missing')) {
+      return {
+        condition: 'Missing' as const,
+        label: 'Missing / Extracted',
+        notes: `Extracted or missing as of ${latest.date}. Note: ${latest.diagnosis}`,
+        surfaces,
+        badgeColor: 'bg-slate-200 text-slate-700 border-slate-300',
+        dotColor: 'bg-slate-500',
+      };
+    } else if (diag.includes('caries') || diag.includes('decay')) {
+      return {
+        condition: 'Caries' as const,
+        label: 'Active Caries / Decay',
+        notes: `Active finding: ${latest.diagnosis} (${latest.date}). Recommended: ${latest.treatmentPlanSummary || 'Restorative filling'}`,
+        surfaces,
+        badgeColor: 'bg-amber-100 text-amber-900 border-amber-400',
+        dotColor: 'bg-amber-600',
+      };
+    }
+
+    return {
+      condition: 'Restored' as const,
+      label: latest.procedureName,
+      notes: `Restoration / treatment performed on ${latest.date}: ${latest.procedureName}. Finding: ${latest.diagnosis}`,
+      surfaces,
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+      dotColor: 'bg-blue-600',
+    };
+  };
+
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
       {/* Back button & Action Bar */}
@@ -267,6 +353,11 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
                         {note.toothNumber}
                       </span>
                     )}
+                    {note.toothSurfaces && note.toothSurfaces.length > 0 && (
+                      <span className="text-[11px] font-mono font-bold text-primary-700 bg-primary-100/70 border border-primary-300 px-2 py-0.5 rounded-lg">
+                        Surfaces: {note.toothSurfaces.join('')}
+                      </span>
+                    )}
                   </div>
 
                   {note.vitals && (
@@ -340,18 +431,23 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
             <div className="grid grid-cols-8 sm:grid-cols-16 gap-1.5">
               {upperTeeth.map((num) => {
                 const isSelected = selectedTooth === num;
+                const status = getToothStatus(num);
                 return (
                   <button
                     key={num}
                     onClick={() => setSelectedTooth(num)}
+                    title={`Tooth #${num}: ${status.label}`}
                     className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all ${
                       isSelected
                         ? 'bg-primary-600 text-white border-primary-600 shadow-md scale-105'
-                        : 'bg-surface-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        : `${status.badgeColor} hover:brightness-95`
                     }`}
                   >
                     <span className="text-[10px] font-mono font-bold">#{num}</span>
                     <span className="text-sm">🦷</span>
+                    {status.condition !== 'Healthy' && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor} mt-0.5`} />
+                    )}
                   </button>
                 );
               })}
@@ -366,23 +462,22 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
             <div className="grid grid-cols-8 sm:grid-cols-16 gap-1.5">
               {lowerTeeth.map((num) => {
                 const isSelected = selectedTooth === num;
-                const hasRestoration = num === 19;
+                const status = getToothStatus(num);
                 return (
                   <button
                     key={num}
                     onClick={() => setSelectedTooth(num)}
+                    title={`Tooth #${num}: ${status.label}`}
                     className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all ${
                       isSelected
                         ? 'bg-primary-600 text-white border-primary-600 shadow-md scale-105'
-                        : hasRestoration
-                        ? 'bg-amber-50 border-amber-300 text-amber-900'
-                        : 'bg-surface-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        : `${status.badgeColor} hover:brightness-95`
                     }`}
                   >
                     <span className="text-[10px] font-mono font-bold">#{num}</span>
                     <span className="text-sm">🦷</span>
-                    {hasRestoration && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-0.5" />
+                    {status.condition !== 'Healthy' && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor} mt-0.5`} />
                     )}
                   </button>
                 );
@@ -390,29 +485,64 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
             </div>
           </div>
 
-          {/* Selected Tooth Info */}
-          {selectedTooth && (
-            <div className="p-4 bg-surface-50 rounded-2xl border border-border flex items-center justify-between">
-              <div>
-                <span className="font-bold text-sm text-slate-900">
-                  Tooth #{selectedTooth} Selected
-                </span>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  {selectedTooth === 19
-                    ? 'Restored with D2391 Resin Composite (Occlusal). Margin stable, no sensitivity.'
-                    : 'Healthy dentition; no active caries or existing restorations recorded.'}
-                </p>
-              </div>
-              {canWriteNotes && (
-                <button
-                  onClick={() => setIsAddNoteModalOpen(true)}
-                  className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-xs font-bold hover:bg-primary-700"
-                >
-                  Document Tooth #{selectedTooth}
-                </button>
-              )}
+          {/* Odontogram Legend */}
+          <div className="flex items-center justify-center gap-4 text-[11px] font-medium text-slate-500 pt-2 border-t border-border/60 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span>Healthy</span>
             </div>
-          )}
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              <span>Restored / Composite</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />
+              <span>Crown / Prosthetic</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
+              <span>Endodontic (Root Canal)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
+              <span>Missing / Extracted</span>
+            </div>
+          </div>
+
+          {/* Selected Tooth Info */}
+          {selectedTooth && (() => {
+            const status = getToothStatus(selectedTooth);
+            return (
+              <div className="p-4 bg-surface-50 rounded-2xl border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-slate-900">
+                      Tooth #{selectedTooth} Selected
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${status.badgeColor}`}>
+                      {status.label}
+                    </span>
+                    {status.surfaces && status.surfaces.length > 0 && (
+                      <span className="text-[10px] font-mono font-bold text-primary-700 bg-primary-100 border border-primary-200 px-2 py-0.5 rounded-md">
+                        Surfaces: {status.surfaces.join('')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {status.notes}
+                  </p>
+                </div>
+                {canWriteNotes && (
+                  <button
+                    onClick={() => setIsAddNoteModalOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-primary-600 text-white text-xs font-bold hover:bg-primary-700 shadow-sm transition-all whitespace-nowrap"
+                  >
+                    Document Tooth #{selectedTooth}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

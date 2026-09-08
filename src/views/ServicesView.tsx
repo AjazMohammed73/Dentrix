@@ -8,6 +8,7 @@ import {
   CheckCircle,
   Tag,
   Stethoscope,
+  Edit3,
 } from 'lucide-react';
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
@@ -15,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { ServiceCategory, DentalService } from '../types';
 import { formatINR } from '../utils/format';
 import { AccessDeniedView } from './AccessDeniedView';
+import { EditServiceModal } from '../components/modals/EditServiceModal';
 
 interface ServicesViewProps {
   onOpenAddService: () => void;
@@ -42,6 +44,7 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenAddService, on
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [editingService, setEditingService] = useState<DentalService | null>(null);
 
   const categories: string[] = [
     'All',
@@ -130,12 +133,12 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenAddService, on
                 <th className="py-3.5 px-5">Standard Duration</th>
                 <th className="py-3.5 px-5">Base Fee</th>
                 <th className="py-3.5 px-5">Status</th>
-                <th className="py-3.5 px-5 text-right">Toggle Active</th>
+                <th className="py-3.5 px-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filteredServices.map((service) => (
-                <tr key={service.id} className="hover:bg-surface-50/60">
+                <tr key={service.id} className="hover:bg-surface-50/60 transition-colors">
                   <td className="py-4 px-5">
                     <span className="font-mono font-black text-sm text-primary-700 bg-primary-50 px-2.5 py-1 rounded-xl border border-primary-200">
                       {service.code}
@@ -165,7 +168,7 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenAddService, on
                   </td>
 
                   <td className="py-4 px-5">
-                    <span className="font-black text-sm text-slate-900">
+                    <span className="font-black text-sm text-slate-900 font-mono">
                       {formatINR(service.basePrice)}
                     </span>
                   </td>
@@ -177,16 +180,27 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenAddService, on
                   </td>
 
                   <td className="py-4 px-5 text-right">
-                    <button
-                      onClick={() => toggleServiceActive(service.id)}
-                      className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all ${
-                        service.isActive
-                          ? 'bg-white text-slate-600 border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {service.isActive ? 'Deactivate' : 'Enable'}
-                    </button>
+                    <div className="flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() => setEditingService(service)}
+                        className="inline-flex items-center space-x-1.5 text-[11px] font-bold px-2.5 py-1 rounded-xl bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 hover:border-primary-300 transition-all shadow-sm active:scale-95"
+                        title={`Edit ${service.code} procedure details and fee`}
+                      >
+                        <Edit3 size={13} />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        onClick={() => toggleServiceActive(service.id)}
+                        className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all active:scale-95 ${
+                          service.isActive
+                            ? 'bg-white text-slate-600 border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {service.isActive ? 'Deactivate' : 'Enable'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -194,6 +208,13 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onOpenAddService, on
           </table>
         </div>
       </div>
+
+      {/* Edit Dental Procedure Modal */}
+      <EditServiceModal
+        isOpen={!!editingService}
+        onClose={() => setEditingService(null)}
+        service={editingService}
+      />
     </div>
   );
 };

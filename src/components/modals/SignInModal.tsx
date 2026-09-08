@@ -10,34 +10,39 @@ interface SignInModalProps {
 }
 
 export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { loginWithEmail, allUsers } = useAuth();
+  const { loginWithCredentials, allUsers } = useAuth();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('••••••••');
+  const [password, setPassword] = useState('Password123!');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setIsLoading(true);
 
-    setTimeout(() => {
-      const result = loginWithEmail(email);
+    try {
+      const result = await loginWithCredentials(email, password);
       setIsLoading(false);
 
       if (result.success) {
         onClose();
         if (onSuccess) onSuccess();
       } else {
-        setErrorMessage(result.error || 'Failed to sign in. Please check your email.');
+        setErrorMessage(result.error || 'Failed to sign in. Please verify your credentials.');
       }
-    }, 400);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage(err?.message || 'Authentication error.');
+    }
   };
 
   const handleQuickSelect = (userEmail: string) => {
     setEmail(userEmail);
+    setPassword('Password123!');
     setErrorMessage(null);
   };
 
@@ -78,8 +83,8 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
         {/* Header */}
         <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-surface-50 to-white">
           <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center">
-              <Tooth3D size={38} />
+            <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center">
+              <Tooth3D size={46} />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -133,19 +138,27 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-700">Security Password</label>
-                <span className="text-[11px] text-primary-600 font-semibold cursor-pointer hover:underline">
-                  Forgot?
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  Demo: <span className="font-mono text-primary-700 font-bold">Password123!</span>
                 </span>
               </div>
               <div className="relative">
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
+                  placeholder="Enter clinic security password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-surface-50 border border-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100"
+                  className="w-full bg-surface-50 border border-border rounded-xl pl-10 pr-16 py-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 hover:text-slate-700"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
               </div>
             </div>
 

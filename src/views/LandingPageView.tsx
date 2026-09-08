@@ -86,7 +86,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
           {/* Brand */}
           <div className="flex items-center space-x-3 cursor-pointer" onClick={onLaunchApp}>
             <div className="flex-shrink-0">
-              <Tooth3D size={40} onClick={onLaunchApp} />
+              <Tooth3D size={48} onClick={onLaunchApp} />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -153,9 +153,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
 
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="text-center max-w-3xl mx-auto space-y-6">
-            {/* Top Tagline Badge with refined 3D Tooth */}
+            {/* Top Tagline Badge with prominent 3D Tooth */}
             <div className="inline-flex items-center gap-3 bg-white/90 backdrop-blur-md border border-primary-200/80 pl-2 pr-5 py-1.5 rounded-full shadow-md shadow-primary-500/10 hover:border-primary-400 transition-all cursor-pointer group" onClick={onLaunchApp}>
-              <Tooth3D size={34} />
+              <Tooth3D size={40} />
               <div className="text-left">
                 <span className="text-[11px] font-extrabold text-primary-800 tracking-wide block">
                   Next-Gen 3D Dental Suite

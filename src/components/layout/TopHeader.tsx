@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Bell,
   Search,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
+import { AuditLogModal } from '../modals/AuditLogModal';
 
 interface TopHeaderProps {
   onQuickBook: () => void;
@@ -39,6 +40,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   } = useAuth();
 
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
+  const canViewAudit = currentUser.role === 'DOCTOR_ADMIN' || currentUser.role === 'SUPER_ADMIN';
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
   const roles: { role: UserRole; label: string; icon: LucideIcon }[] = [
     { role: 'SUPER_ADMIN', label: 'Super Admin', icon: ShieldCheck },
@@ -166,6 +169,18 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <span className="hidden md:inline">Sign Out</span>
         </button>
 
+        {/* Audit Trail Trigger */}
+        {canViewAudit && (
+          <button
+            onClick={() => setIsAuditModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+            title="Open HIPAA & Security Audit Trail"
+          >
+            <ShieldCheck size={14} className="text-purple-700" />
+            <span className="hidden sm:inline">Audit Trail</span>
+          </button>
+        )}
+
         {/* Notification Bell */}
         <div className="relative">
           <button
@@ -177,6 +192,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Audit Log Modal */}
+      <AuditLogModal
+        isOpen={isAuditModalOpen}
+        onClose={() => setIsAuditModalOpen(false)}
+      />
     </header>
   );
 };

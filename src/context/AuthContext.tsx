@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, ClinicTenant, UserRole, UserPermissions } from '../types';
 import { initialTenants, initialUsers } from '../data/mockData';
+import { verifyPassword } from '../utils/crypto';
 
 interface AuthContextType {
   currentUser: User;
@@ -9,6 +10,7 @@ interface AuthContextType {
   allUsers: User[];
   isAuthenticated: boolean;
   loginWithEmail: (email: string) => { success: boolean; error?: string };
+  loginWithCredentials: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   switchRole: (role: UserRole, tenantId?: string) => void;
   switchTenant: (tenantId: string) => void;
@@ -68,6 +70,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isAuthenticated]);
 
   const currentTenant = allTenants.find((t) => t.id === currentUser.tenantId) || null;
+
+  const loginWithCredentials = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const foundUser = allUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    if (!foundUser) {
+      return {
+        success: false,
+        error: `No account found associated with "${email}". Please verify the email address or select a demo account.`,
+      };
+    }
+
+    if (foundUser.status === 'suspended') {
+      return {
+        success: false,
+        error: `Account for ${foundUser.name} is currently suspended. Please contact your Clinic Administrator.`,
+      };
+    }
+
+    // Verify Password if provided
+    if (password !== undefined && password.trim().length > 0) {
+      const isValid = await verifyPassword(password, foundUser.passwordHash, foundUser.salt);
+      if (!isValid) {
+        return {
+          success: false,
+          error: `Incorrect password for ${foundUser.name}. For demo testing, default password is "Password123!".`,
+        };
+      }
+    }
+
+    setCurrentUser(foundUser);
+    setIsAuthenticated(true);
+    return { success: true };
+  };
 
   const loginWithEmail = (email: string): { success: boolean; error?: string } => {
     const cleanEmail = email.trim().toLowerCase();
@@ -269,6 +305,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         allUsers,
         isAuthenticated,
         loginWithEmail,
+        loginWithCredentials,
         logout,
         switchRole,
         switchTenant,

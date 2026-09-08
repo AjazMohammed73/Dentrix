@@ -35,6 +35,22 @@ export interface ClinicTenant {
   createdAt: string;
 }
 
+export type ToothCondition =
+  | 'Healthy'
+  | 'Restored'
+  | 'Caries'
+  | 'Crown'
+  | 'Missing'
+  | 'Endodontic';
+
+export interface ToothRecord {
+  toothNumber: number;
+  condition: ToothCondition;
+  surface?: string;
+  notes?: string;
+  dateUpdated?: string;
+}
+
 export interface User {
   id: string;
   tenantId: string | null; // null for Super Admin
@@ -42,6 +58,8 @@ export interface User {
   email: string;
   role: UserRole;
   title: string;
+  passwordHash?: string;
+  salt?: string;
   phone?: string;
   avatar?: string;
   permissions: UserPermissions;
@@ -77,6 +95,8 @@ export interface Patient {
   createdAt: string;
 }
 
+export type ToothSurface = 'M' | 'O' | 'D' | 'F' | 'L' | 'B' | 'I';
+
 export interface ClinicalNote {
   id: string;
   tenantId: string;
@@ -85,6 +105,8 @@ export interface ClinicalNote {
   doctorName: string;
   date: string;
   toothNumber?: string;
+  toothNumbers?: number[]; // Multi-tooth support
+  toothSurfaces?: ToothSurface[]; // Mesial, Occlusal, Distal, Facial/Buccal, Lingual, Incisal
   procedureName: string;
   diagnosis: string;
   notes: string;
@@ -153,6 +175,17 @@ export interface Appointment {
 
 export type InvoiceStatus = 'Paid' | 'Pending' | 'Overdue';
 
+export interface PaymentInstallment {
+  id: string;
+  receiptNumber?: string;
+  date: string;
+  amount: number;
+  method: 'Credit Card' | 'Insurance' | 'Cash' | 'Debit Card' | 'UPI / Bank';
+  collectedBy?: string;
+  recordedBy?: string;
+  notes?: string;
+}
+
 export interface Invoice {
   id: string;
   tenantId: string;
@@ -167,7 +200,47 @@ export interface Invoice {
   date: string;
   dueDate: string;
   status: InvoiceStatus;
-  paymentMethod?: 'Credit Card' | 'Insurance' | 'Cash' | 'Debit Card';
+  paymentMethod?: 'Credit Card' | 'Insurance' | 'Cash' | 'Debit Card' | 'UPI / Bank';
+  installments?: PaymentInstallment[];
+  insuranceClaim?: {
+    claimId: string;
+    status: 'Draft' | 'Submitted' | 'Under Review' | 'Approved' | 'Settled' | 'Rejected';
+    payerName: string;
+    claimedAmount: number;
+    approvedAmount?: number;
+    submittedDate?: string;
+  };
+}
+
+export type AuditAction =
+  | 'SECURITY_LOGIN'
+  | 'SECURITY_LOGOUT'
+  | 'PATIENT_VIEWED'
+  | 'PATIENT_CREATED'
+  | 'PATIENT_UPDATED'
+  | 'APPOINTMENT_SCHEDULED'
+  | 'APPOINTMENT_STATUS_CHANGED'
+  | 'APPOINTMENT_OVERRIDDEN'
+  | 'APPOINTMENT_DELETED'
+  | 'NOTE_SIGNED'
+  | 'INVOICE_CREATED'
+  | 'PAYMENT_RECORDED'
+  | 'INVOICE_DELETED'
+  | 'SERVICE_CREATED'
+  | 'SERVICE_UPDATED';
+
+export interface AuditLogEntry {
+  id: string;
+  tenantId: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  action: AuditAction;
+  resourceType: 'Patient' | 'Appointment' | 'ClinicalNote' | 'Invoice' | 'Security' | 'Service';
+  resourceId?: string;
+  details: string;
+  ipAddress?: string;
 }
 
 export interface SystemHealth {

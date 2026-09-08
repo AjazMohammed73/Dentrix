@@ -12,12 +12,13 @@ import {
   Printer,
   Share2,
   Trash2,
+  X,
 } from 'lucide-react';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { InvoiceStatus, Invoice } from '../types';
+import { InvoiceStatus, Invoice, PaymentInstallment } from '../types';
 import { formatINR } from '../utils/format';
 import { AccessDeniedView } from './AccessDeniedView';
 import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
@@ -28,11 +29,15 @@ interface RevenueViewProps {
 }
 
 export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
-  const { invoices, appointments, markInvoicePaid, deleteInvoice } = useData();
+  const { invoices, appointments, markInvoicePaid, addInvoicePayment, deleteInvoice } = useData();
   const { currentUser, currentTenant } = useAuth();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Invoice | null>(null);
+  const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
+  const [installmentAmount, setInstallmentAmount] = useState<number>(0);
+  const [installmentMethod, setInstallmentMethod] = useState<PaymentInstallment['method']>('UPI / Bank');
+  const [installmentNotes, setInstallmentNotes] = useState<string>('');
 
   const canViewRevenue =
     currentUser.permissions.canViewRevenue ||
@@ -354,12 +359,26 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                   </td>
                   <td className="py-3.5 px-4">
                     {inv.status !== 'Paid' ? (
-                      <button
-                        onClick={() => markInvoicePaid(inv.id, 'Credit Card')}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-sm transition-all"
-                      >
-                        Mark Paid
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          onClick={() => {
+                            setPaymentModalInvoice(inv);
+                            setInstallmentAmount(inv.balance);
+                            setInstallmentNotes('');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-[11px] font-bold shadow-sm transition-all whitespace-nowrap"
+                          title="Record Installment or Partial Payment"
+                        >
+                          Pay
+                        </button>
+                        <button
+                          onClick={() => markInvoicePaid(inv.id, 'Credit Card')}
+                          className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold transition-all whitespace-nowrap"
+                          title="Clear Remaining Balance Fully"
+                        >
+                          Clear Full
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
                         <CheckCircle2 size={13} /> {inv.paymentMethod || 'Paid'}
@@ -390,7 +409,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                             `*Balance Due:* ${formatINR(inv.balance)}\n` +
                             `*Status:* ${inv.status.toUpperCase()}\n` +
                             `Thank you! • _Powered by Axiotronicx.Inc_`;
-                          window.open(`https://api.whatsapp.com/send?text=${encodeURI(msg)}`, '_blank');
+                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
                         }}
                         className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                         title="Share via WhatsApp"
@@ -417,6 +436,153 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
           </table>
         </div>
       </div>
+
+      {/* Record Payment Installment Modal */}
+      {paymentModalInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-border overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-surface-50">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-primary-100 text-primary-700">
+                  <CreditCard size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Record Payment Installment</h3>
+                  <p className="text-[11px] text-slate-500">Invoice #{paymentModalInvoice.invoiceNumber}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPaymentModalInvoice(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (installmentAmount <= 0) return;
+                addInvoicePayment(paymentModalInvoice.id, {
+                  amount: Number(installmentAmount),
+                  method: installmentMethod,
+                  notes: installmentNotes,
+                });
+                setPaymentModalInvoice(null);
+              }}
+              className="p-6 space-y-4"
+            >
+              {/* Patient & Financial Summary Card */}
+              <div className="p-3.5 bg-surface-50 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
+                <div className="flex justify-between font-medium">
+                  <span className="text-slate-500">Patient:</span>
+                  <span className="font-bold text-slate-900">{paymentModalInvoice.patientName}</span>
+                </div>
+                <div className="flex justify-between font-medium">
+                  <span className="text-slate-500">Total Procedure Fee:</span>
+                  <span className="font-bold text-slate-900">{formatINR(paymentModalInvoice.amount)}</span>
+                </div>
+                <div className="flex justify-between font-medium text-emerald-600">
+                  <span>Total Already Paid:</span>
+                  <span className="font-bold">{formatINR(paymentModalInvoice.amountPaid)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-rose-600 pt-1.5 border-t border-slate-200">
+                  <span>Outstanding Balance:</span>
+                  <span>{formatINR(paymentModalInvoice.balance)}</span>
+                </div>
+              </div>
+
+              {/* Installment Amount */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Payment Installment Amount (₹)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={paymentModalInvoice.balance}
+                    required
+                    value={installmentAmount}
+                    onChange={(e) => setInstallmentAmount(Number(e.target.value))}
+                    className="w-full pl-8 pr-3.5 py-2 bg-surface-50 border border-border rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary-600 font-mono"
+                  />
+                </div>
+                <div className="flex gap-2 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setInstallmentAmount(paymentModalInvoice.balance)}
+                    className="text-[10px] font-bold text-primary-700 hover:underline"
+                  >
+                    Pay Full (₹{paymentModalInvoice.balance.toLocaleString()})
+                  </button>
+                  {paymentModalInvoice.balance > 2000 && (
+                    <button
+                      type="button"
+                      onClick={() => setInstallmentAmount(Math.round(paymentModalInvoice.balance / 2))}
+                      className="text-[10px] font-bold text-slate-600 hover:underline"
+                    >
+                      Pay 50% (₹{Math.round(paymentModalInvoice.balance / 2).toLocaleString()})
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Payment Method
+                </label>
+                <select
+                  value={installmentMethod}
+                  onChange={(e) => setInstallmentMethod(e.target.value as PaymentInstallment['method'])}
+                  className="w-full px-3.5 py-2 bg-surface-50 border border-border rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-600"
+                >
+                  <option value="UPI / Bank">UPI / QR Code / Net Banking (GPay, PhonePe, NEFT)</option>
+                  <option value="Credit Card">Credit Card (POS Terminal)</option>
+                  <option value="Debit Card">Debit Card</option>
+                  <option value="Cash">Cash (Physical Counter)</option>
+                  <option value="Insurance">Dental Insurance Settlement</option>
+                </select>
+              </div>
+
+              {/* Transaction Reference / Notes */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Transaction Reference / Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={installmentNotes}
+                  onChange={(e) => setInstallmentNotes(e.target.value)}
+                  placeholder="e.g. UPI Ref #90281203810, Cheque #00412"
+                  className="w-full px-3.5 py-2 bg-surface-50 border border-border rounded-xl text-xs text-slate-800 focus:outline-none focus:border-primary-600"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-border flex items-center justify-end space-x-2.5">
+                <button
+                  type="button"
+                  onClick={() => setPaymentModalInvoice(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-md shadow-primary-600/20"
+                >
+                  Record Payment Receipt
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create Invoice Modal */}
       <CreateInvoiceModal

@@ -43,7 +43,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
       `Thank you for trusting us with your dental health!\n` +
       `Powered by Axiotronicx.Inc`;
 
-    const encodedMessage = encodeURI(message);
+    const encodedMessage = encodeURIComponent(message);
     window.open(`https://api.whatsapp.com/send?text=${encodedMessage}`, '_blank');
   };
 
@@ -235,6 +235,35 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Payment Installments & Receipts Breakdown */}
+              {invoice.installments && invoice.installments.length > 0 && (
+                <div className="pt-2">
+                  <span className="font-bold text-[10px] uppercase tracking-wider block text-black mb-1">
+                    Recorded Payment Receipts:
+                  </span>
+                  <table className="w-full text-left text-[10px] border-collapse border border-black">
+                    <thead>
+                      <tr className="border-b border-black text-black font-bold uppercase text-[9px]">
+                        <th className="py-1 px-2 border-r border-black">Date</th>
+                        <th className="py-1 px-2 border-r border-black">Method</th>
+                        <th className="py-1 px-2 border-r border-black">Recorded By</th>
+                        <th className="py-1 px-2 text-right">Amount Paid</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoice.installments.map((inst) => (
+                        <tr key={inst.id} className="border-b border-black">
+                          <td className="py-1 px-2 border-r border-black font-mono">{inst.date}</td>
+                          <td className="py-1 px-2 border-r border-black">{inst.method}</td>
+                          <td className="py-1 px-2 border-r border-black">{inst.recordedBy}</td>
+                          <td className="py-1 px-2 text-right font-mono font-bold">{formatINR(inst.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Terms & Footer Signature */}

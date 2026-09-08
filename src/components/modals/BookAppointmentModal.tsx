@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Calendar, Clock, User, Stethoscope, Armchair, DollarSign } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, Calendar, Clock, User, Stethoscope, Armchair, DollarSign, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { OperatoryChair } from '../../types';
@@ -18,7 +18,7 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   initialDate,
   initialPatientId,
 }) => {
-  const { patients, services, addAppointment } = useData();
+  const { patients, services, addAppointment, checkAppointmentConflict } = useData();
   const { allUsers, currentTenant } = useAuth();
 
   const doctors = allUsers.filter(
@@ -34,6 +34,7 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const [startTime, setStartTime] = useState('10:00');
   const [operatoryChair, setOperatoryChair] = useState<OperatoryChair>('Chair 1 - Hygiene');
   const [notes, setNotes] = useState('');
+  const [allowOverride, setAllowOverride] = useState(false);
 
   if (!isOpen) return null;
 
@@ -41,16 +42,29 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const selectedPatient = patients.find((p) => p.id === patientId) || patients[0];
   const selectedDoctor = doctors.find((d) => d.id === doctorId) || doctors[0];
 
+  // Calculate prospective end time
+  const [hours, mins] = startTime.split(':').map(Number);
+  const endTotalMins = (isNaN(hours) ? 10 : hours) * 60 + (isNaN(mins) ? 0 : mins) + (selectedService?.durationMinutes || 45);
+  const endHours = Math.floor(endTotalMins / 60);
+  const endRemainingMins = endTotalMins % 60;
+  const prospectiveEndTime = `${String(endHours).padStart(2, '0')}:${String(endRemainingMins).padStart(2, '0')}`;
+
+  // Check conflicts in real time
+  const conflictInfo = checkAppointmentConflict(
+    date,
+    startTime,
+    prospectiveEndTime,
+    operatoryChair,
+    selectedDoctor?.id || 'doc_1'
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatient || !selectedService) return;
 
-    // Calculate end time
-    const [hours, mins] = startTime.split(':').map(Number);
-    const endTotalMins = hours * 60 + mins + (selectedService?.durationMinutes || 45);
-    const endHours = Math.floor(endTotalMins / 60);
-    const endRemainingMins = endTotalMins % 60;
-    const endTime = `${String(endHours).padStart(2, '0')}:${String(endRemainingMins).padStart(2, '0')}`;
+    if (conflictInfo.hasConflict && !allowOverride) {
+      return;
+    }
 
     addAppointment({
       patientId: selectedPatient.id,
@@ -63,11 +77,11 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
       procedureCode: selectedService.code,
       date,
       startTime,
-      endTime,
+      endTime: prospectiveEndTime,
       durationMinutes: selectedService.durationMinutes,
       operatoryChair,
       status: 'Scheduled',
-      notes,
+      notes: allowOverride ? `[OVERRIDE APPROVED] ${notes}` : notes,
       fee: selectedService.basePrice,
     });
 
@@ -224,6 +238,39 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
             />
           </div>
 
+          {/* Conflict Warning Banner */}
+          {conflictInfo.hasConflict && (
+            <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-2xl space-y-2 text-rose-900 animate-fadeIn">
+              <div className="flex items-center gap-2 font-bold text-xs text-rose-700">
+                <AlertTriangle size={16} className="text-rose-600 flex-shrink-0" />
+                <span>Scheduling Conflict Detected</span>
+              </div>
+              <p className="text-[11px] text-rose-800 leading-relaxed">
+                {conflictInfo.chairConflict && (
+                  <span className="block">
+                    • <strong>Operatory Conflict:</strong> {operatoryChair} is already reserved for{' '}
+                    <em>{conflictInfo.chairConflict.patientName}</em> ({conflictInfo.chairConflict.startTime} – {conflictInfo.chairConflict.endTime}).
+                  </span>
+                )}
+                {conflictInfo.doctorConflict && (
+                  <span className="block">
+                    • <strong>Provider Conflict:</strong> {selectedDoctor?.name || 'Selected Doctor'} already has an active appointment ({conflictInfo.doctorConflict.startTime} – {conflictInfo.doctorConflict.endTime}).
+                  </span>
+                )}
+              </p>
+
+              <label className="flex items-center gap-2 pt-1 text-[11px] font-bold text-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allowOverride}
+                  onChange={(e) => setAllowOverride(e.target.checked)}
+                  className="rounded border-rose-400 text-rose-600 focus:ring-rose-500"
+                />
+                <span>Authorize Double-Booking / Emergency Chair Override</span>
+              </label>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="pt-4 border-t border-border flex items-center justify-end space-x-3">
             <button
@@ -235,9 +282,14 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-md shadow-primary-600/25 transition-all"
+              disabled={conflictInfo.hasConflict && !allowOverride}
+              className={`px-5 py-2 text-xs font-bold rounded-xl shadow-md transition-all ${
+                conflictInfo.hasConflict && !allowOverride
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                  : 'text-white bg-primary-600 hover:bg-primary-700 shadow-primary-600/25'
+              }`}
             >
-              Confirm Appointment
+              {conflictInfo.hasConflict && allowOverride ? 'Override & Book' : 'Confirm Appointment'}
             </button>
           </div>
         </form>
