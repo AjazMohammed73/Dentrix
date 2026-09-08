@@ -120,6 +120,7 @@ export interface DentalService {
 export type AppointmentStatus =
   | 'Scheduled'
   | 'In-Chair'
+  | 'Delayed'
   | 'Completed'
   | 'Cancelled'
   | 'No-Show';

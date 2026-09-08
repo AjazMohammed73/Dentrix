@@ -38,12 +38,14 @@ interface DataContextType {
   updatePatient: (patient: Patient) => void;
   addAppointment: (appointmentData: Omit<Appointment, 'id' | 'tenantId'>) => Appointment;
   updateAppointmentStatus: (id: string, status: AppointmentStatus) => void;
+  deleteAppointment: (id: string) => void;
   addClinicalNote: (noteData: Omit<ClinicalNote, 'id' | 'tenantId' | 'signedAt'>) => ClinicalNote;
   addService: (serviceData: Omit<DentalService, 'id' | 'tenantId'>) => DentalService;
   updateService: (service: DentalService) => void;
   toggleServiceActive: (id: string) => void;
   addInvoice: (invoiceData: Omit<Invoice, 'id' | 'tenantId'>) => Invoice;
   markInvoicePaid: (id: string, paymentMethod?: Invoice['paymentMethod']) => void;
+  deleteInvoice: (id: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -183,6 +185,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
+  const deleteAppointment = (id: string) => {
+    setAllAppointments((prev) => prev.filter((a) => a.id !== id));
+  };
+
   const addClinicalNote = (
     noteData: Omit<ClinicalNote, 'id' | 'tenantId' | 'signedAt'>
   ): ClinicalNote => {
@@ -242,6 +248,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
+  const deleteInvoice = (id: string) => {
+    setAllInvoices((prev) => prev.filter((inv) => inv.id !== id));
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -259,12 +269,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updatePatient,
         addAppointment,
         updateAppointmentStatus,
+        deleteAppointment,
         addClinicalNote,
         addService,
         updateService,
         toggleServiceActive,
         addInvoice,
         markInvoicePaid,
+        deleteInvoice,
       }}
     >
       {children}

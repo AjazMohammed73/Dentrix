@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   ChevronRight,
   Filter,
+  FileText,
 } from 'lucide-react';
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
@@ -18,11 +19,13 @@ import { formatINR } from '../utils/format';
 interface PatientsViewProps {
   onSelectPatient: (patientId: string) => void;
   onOpenAddPatient: () => void;
+  onOpenCreateInvoice?: (patientId?: string) => void;
 }
 
 export const PatientsView: React.FC<PatientsViewProps> = ({
   onSelectPatient,
   onOpenAddPatient,
+  onOpenCreateInvoice,
 }) => {
   const { patients } = useData();
   const { currentUser } = useAuth();
@@ -59,13 +62,25 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onOpenAddPatient}
-          className="flex items-center space-x-1.5 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md shadow-primary-600/20 transition-all"
-        >
-          <UserPlus size={16} />
-          <span>Register New Patient</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          {onOpenCreateInvoice && (
+            <button
+              onClick={() => onOpenCreateInvoice()}
+              className="flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm"
+              title="Create Patient Invoice"
+            >
+              <FileText size={15} className="text-emerald-700" />
+              <span>Create Invoice</span>
+            </button>
+          )}
+          <button
+            onClick={onOpenAddPatient}
+            className="flex items-center space-x-1.5 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md shadow-primary-600/20 transition-all"
+          >
+            <UserPlus size={16} />
+            <span>Register New Patient</span>
+          </button>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -178,9 +193,24 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                   </td>
 
                   <td className="py-4 px-5 text-right">
-                    <div className="inline-flex items-center text-primary-600 group-hover:translate-x-1 transition-transform">
-                      <span className="text-xs font-bold mr-1">Chart</span>
-                      <ChevronRight size={16} />
+                    <div className="inline-flex items-center space-x-2">
+                      {onOpenCreateInvoice && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenCreateInvoice(patient.id);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-surface-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-[11px] font-semibold transition-all flex items-center gap-1"
+                          title="Generate Invoice for this patient"
+                        >
+                          <FileText size={12} />
+                          <span>Bill</span>
+                        </button>
+                      )}
+                      <div className="inline-flex items-center text-primary-600 group-hover:translate-x-0.5 transition-transform">
+                        <span className="text-xs font-bold mr-1">Chart</span>
+                        <ChevronRight size={16} />
+                      </div>
                     </div>
                   </td>
                 </tr>

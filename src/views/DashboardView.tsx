@@ -14,6 +14,7 @@ import {
   HardDrive,
   Activity,
   ArrowRight,
+  FileText,
 } from 'lucide-react';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
@@ -27,12 +28,14 @@ interface DashboardViewProps {
   onNavigate: (route: NavRoute) => void;
   onBookAppointment: () => void;
   onSelectPatient: (patientId: string) => void;
+  onOpenCreateInvoice?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
   onBookAppointment,
   onSelectPatient,
+  onOpenCreateInvoice,
 }) => {
   const { currentUser, currentTenant, allTenants } = useAuth();
   const {
@@ -227,6 +230,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {onOpenCreateInvoice && (
+            <button
+              onClick={onOpenCreateInvoice}
+              className="px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 transition-colors flex items-center gap-1.5 shadow-sm"
+              title="Generate Patient Invoice"
+            >
+              <FileText size={15} className="text-emerald-700" />
+              <span>Create Invoice</span>
+            </button>
+          )}
           <button
             onClick={() => onNavigate('appointments')}
             className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-surface-100 transition-colors"
@@ -410,6 +423,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         return 'danger';
                       case 'Scheduled':
                         return 'info';
+                      case 'Delayed':
+                        return 'warning';
                       default:
                         return 'neutral';
                     }
@@ -446,6 +461,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         >
                           <option value="Scheduled">Scheduled</option>
                           <option value="In-Chair">In-Chair</option>
+                          <option value="Delayed">Delayed</option>
                           <option value="Completed">Completed</option>
                           <option value="Cancelled">Cancelled</option>
                           <option value="No-Show">No-Show</option>

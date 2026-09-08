@@ -22,6 +22,9 @@ import { AddServiceModal } from './components/modals/AddServiceModal';
 import { AddStaffModal } from './components/modals/AddStaffModal';
 import { OnboardTenantModal } from './components/modals/OnboardTenantModal';
 import { SignInModal } from './components/modals/SignInModal';
+import { CreateInvoiceModal } from './components/modals/CreateInvoiceModal';
+import { InvoicePrintModal } from './components/modals/InvoicePrintModal';
+import { Invoice } from './types';
 
 const AppContent: React.FC = () => {
   const { currentUser, isAuthenticated } = useAuth();
@@ -33,10 +36,18 @@ const AppContent: React.FC = () => {
   // Modals state
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
   const [bookModalPatientId, setBookModalPatientId] = useState<string | undefined>(undefined);
+  const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
+  const [createInvoicePatientId, setCreateInvoicePatientId] = useState<string | undefined>(undefined);
+  const [createdInvoiceForPrint, setCreatedInvoiceForPrint] = useState<Invoice | null>(null);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isAddServiceOpen, setIsAddServiceOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isOnboardTenantOpen, setIsOnboardTenantOpen] = useState(false);
+
+  const handleOpenCreateInvoice = (patientId?: string) => {
+    setCreateInvoicePatientId(patientId);
+    setIsCreateInvoiceOpen(true);
+  };
 
   const handleSelectPatient = (patientId: string) => {
     setSelectedPatientId(patientId);
@@ -102,6 +113,7 @@ const AppContent: React.FC = () => {
         {/* Top Header */}
         <TopHeader
           onQuickBook={handleQuickBook}
+          onOpenCreateInvoice={() => handleOpenCreateInvoice()}
           onViewLandingPage={() => setShowLandingPage(true)}
           onSignOut={handleSignOut}
         />
@@ -114,6 +126,7 @@ const AppContent: React.FC = () => {
               patientId={selectedPatientId}
               onBack={() => setSelectedPatientId(null)}
               onBookAppointment={handleBookForPatient}
+              onOpenCreateInvoice={handleOpenCreateInvoice}
             />
           ) : (
             <>
@@ -122,6 +135,7 @@ const AppContent: React.FC = () => {
                   onNavigate={handleNavigate}
                   onBookAppointment={handleQuickBook}
                   onSelectPatient={handleSelectPatient}
+                  onOpenCreateInvoice={() => handleOpenCreateInvoice()}
                 />
               )}
 
@@ -136,6 +150,7 @@ const AppContent: React.FC = () => {
                 <PatientsView
                   onSelectPatient={handleSelectPatient}
                   onOpenAddPatient={() => setIsAddPatientOpen(true)}
+                  onOpenCreateInvoice={handleOpenCreateInvoice}
                 />
               )}
 
@@ -198,6 +213,24 @@ const AppContent: React.FC = () => {
       <OnboardTenantModal
         isOpen={isOnboardTenantOpen}
         onClose={() => setIsOnboardTenantOpen(false)}
+      />
+
+      <CreateInvoiceModal
+        isOpen={isCreateInvoiceOpen}
+        onClose={() => {
+          setIsCreateInvoiceOpen(false);
+          setCreateInvoicePatientId(undefined);
+        }}
+        initialPatientId={createInvoicePatientId}
+        onInvoiceCreated={(invoice) => {
+          setCreatedInvoiceForPrint(invoice);
+        }}
+      />
+
+      <InvoicePrintModal
+        isOpen={!!createdInvoiceForPrint}
+        onClose={() => setCreatedInvoiceForPrint(null)}
+        invoice={createdInvoiceForPrint}
       />
     </div>
   );

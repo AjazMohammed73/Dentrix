@@ -77,9 +77,9 @@ export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuc
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-border overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-surface-50 to-white">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 flex-shrink-0">
-              <Tooth3D size={40} />
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center">
+              <Tooth3D size={38} />
             </div>
             <div>
               <div className="flex items-center gap-2">

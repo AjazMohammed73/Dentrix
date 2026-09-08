@@ -11,18 +11,21 @@ import {
   Sparkles,
   LucideIcon,
   LogOut,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 
 interface TopHeaderProps {
   onQuickBook: () => void;
+  onOpenCreateInvoice?: () => void;
   onViewLandingPage?: () => void;
   onSignOut?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
   onQuickBook,
+  onOpenCreateInvoice,
   onViewLandingPage,
   onSignOut,
 }) => {
@@ -109,6 +112,18 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             );
           })}
         </div>
+
+        {/* Create Invoice button (Available to Staff and Doctors, without revenue page access) */}
+        {!isSuperAdmin && onOpenCreateInvoice && (
+          <button
+            onClick={onOpenCreateInvoice}
+            className="flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 active:scale-95 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+            title="Create Patient Invoice"
+          >
+            <FileText size={14} className="text-emerald-700" />
+            <span className="hidden sm:inline">Create Invoice</span>
+          </button>
+        )}
 
         {/* Quick Book Appointment button (Doctor or Staff) */}
         {!isSuperAdmin && (

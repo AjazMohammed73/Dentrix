@@ -85,7 +85,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* Brand */}
           <div className="flex items-center space-x-3 cursor-pointer" onClick={onLaunchApp}>
-            <Tooth3D size={44} onClick={onLaunchApp} />
+            <div className="flex-shrink-0">
+              <Tooth3D size={40} onClick={onLaunchApp} />
+            </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-2xl font-black tracking-tight text-slate-900">Dentrix</span>
@@ -151,12 +153,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
 
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="text-center max-w-3xl mx-auto space-y-6">
-            {/* Top Tagline Badge */}
-            <div className="inline-flex items-center gap-2 bg-white border border-primary-200/80 px-4 py-1.5 rounded-full shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-clinical-success animate-pulse" />
-              <span className="text-xs font-extrabold text-primary-800 tracking-wide">
-                Powered by Axiotronicx.Inc — Dental Practice OS
-              </span>
+            {/* Top Tagline Badge with refined 3D Tooth */}
+            <div className="inline-flex items-center gap-3 bg-white/90 backdrop-blur-md border border-primary-200/80 pl-2 pr-5 py-1.5 rounded-full shadow-md shadow-primary-500/10 hover:border-primary-400 transition-all cursor-pointer group" onClick={onLaunchApp}>
+              <Tooth3D size={34} />
+              <div className="text-left">
+                <span className="text-[11px] font-extrabold text-primary-800 tracking-wide block">
+                  Next-Gen 3D Dental Suite
+                </span>
+                <span className="text-[10px] text-slate-500 font-semibold block">
+                  ⚡ Powered by Axiotronicx.Inc • Click to Test-Drive
+                </span>
+              </div>
             </div>
 
             {/* Main Headline */}

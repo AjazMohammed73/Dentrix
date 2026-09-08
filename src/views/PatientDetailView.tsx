@@ -25,12 +25,14 @@ interface PatientDetailViewProps {
   patientId: string;
   onBack: () => void;
   onBookAppointment: (patientId: string) => void;
+  onOpenCreateInvoice?: (patientId: string) => void;
 }
 
 export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
   patientId,
   onBack,
   onBookAppointment,
+  onOpenCreateInvoice,
 }) => {
   const { patients, clinicalNotes, appointments, invoices } = useData();
   const { currentUser } = useAuth();
@@ -63,7 +65,7 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
 
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Back button & Top bar */}
+      {/* Back button & Action Bar */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
@@ -74,6 +76,16 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
         </button>
 
         <div className="flex items-center space-x-3">
+          {onOpenCreateInvoice && (
+            <button
+              onClick={() => onOpenCreateInvoice(patient.id)}
+              className="flex items-center space-x-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-3.5 py-2 rounded-2xl text-xs font-bold shadow-sm transition-all"
+              title="Generate Invoice for this patient"
+            >
+              <DollarSign size={15} className="text-emerald-700" />
+              <span>Create Invoice</span>
+            </button>
+          )}
           <button
             onClick={() => onBookAppointment(patient.id)}
             className="flex items-center space-x-1.5 bg-white hover:bg-surface-50 text-slate-800 border border-border px-4 py-2 rounded-2xl text-xs font-bold shadow-sm transition-all"

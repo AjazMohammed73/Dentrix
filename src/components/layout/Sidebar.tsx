@@ -107,10 +107,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSi
       }`}
     >
       {/* Header & 3D Tooth Brand */}
-      <div className="h-20 flex items-center px-4 border-b border-border/80 justify-between overflow-hidden">
+      <div className="h-18 py-2.5 flex items-center px-4 border-b border-border/80 justify-between overflow-hidden">
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
-            <Tooth3D size={46} onClick={() => onNavigate('dashboard')} />
+            <Tooth3D size={42} onClick={() => onNavigate('dashboard')} />
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">

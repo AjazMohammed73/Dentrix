@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
@@ -25,11 +27,12 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   onBookAppointment,
   onSelectPatient,
 }) => {
-  const { appointments, updateAppointmentStatus } = useData();
+  const { appointments, updateAppointmentStatus, deleteAppointment } = useData();
 
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedChair, setSelectedChair] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'day' | 'chairs' | 'list'>('chairs');
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
 
   const filteredAppointments = appointments.filter((a) => {
     const matchesDate = a.date === selectedDate;
@@ -80,6 +83,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         return <Badge variant="danger" dot>In-Chair</Badge>;
       case 'Scheduled':
         return <Badge variant="info" dot>Scheduled</Badge>;
+      case 'Delayed':
+        return <Badge variant="warning" dot className="bg-amber-100 text-amber-900 border-amber-300">Delayed</Badge>;
       case 'Cancelled':
         return <Badge variant="neutral">Cancelled</Badge>;
       case 'No-Show':
@@ -267,23 +272,34 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                             <span className="font-bold text-slate-800">{formatINR(apt.fee)}</span>
                           </div>
 
-                          {/* Status changer buttons */}
-                          <div className="flex items-center gap-1.5 pt-1">
-                            {(['Scheduled', 'In-Chair', 'Completed'] as AppointmentStatus[]).map(
-                              (st) => (
-                                <button
-                                  key={st}
-                                  onClick={() => updateAppointmentStatus(apt.id, st)}
-                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all ${
-                                    apt.status === st
-                                      ? 'bg-slate-900 text-white border-slate-900'
-                                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  {st}
-                                </button>
-                              )
-                            )}
+                          {/* Status changer buttons & delete action */}
+                          <div className="flex items-center justify-between gap-1 pt-1">
+                            <div className="flex items-center flex-wrap gap-1">
+                              {(['Scheduled', 'In-Chair', 'Delayed', 'Completed'] as AppointmentStatus[]).map(
+                                (st) => (
+                                  <button
+                                    key={st}
+                                    onClick={() => updateAppointmentStatus(apt.id, st)}
+                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all ${
+                                      apt.status === st
+                                        ? st === 'Delayed'
+                                          ? 'bg-amber-600 text-white border-amber-600'
+                                          : 'bg-slate-900 text-white border-slate-900'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    {st}
+                                  </button>
+                                )
+                              )}
+                            </div>
+                            <button
+                              onClick={() => setAppointmentToDelete(apt)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex-shrink-0"
+                              title="Delete Appointment"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </div>
                       ))
@@ -358,6 +374,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                 <th className="py-3 px-4">Fee</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Update Status</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -390,15 +407,71 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                     >
                       <option value="Scheduled">Scheduled</option>
                       <option value="In-Chair">In-Chair</option>
+                      <option value="Delayed">Delayed</option>
                       <option value="Completed">Completed</option>
                       <option value="Cancelled">Cancelled</option>
                       <option value="No-Show">No-Show</option>
                     </select>
                   </td>
+                  <td className="py-3.5 px-4 text-right">
+                    <button
+                      onClick={() => setAppointmentToDelete(apt)}
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title="Delete Appointment"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Delete Appointment Confirmation Modal */}
+      {appointmentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-border space-y-4">
+            <div className="flex items-center space-x-3 text-rose-600">
+              <div className="p-2.5 bg-rose-50 rounded-2xl">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-base font-extrabold text-slate-900">Confirm Appointment Deletion</h3>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to permanently delete the appointment for{' '}
+              <strong className="text-slate-900">{appointmentToDelete.patientName}</strong> on{' '}
+              <strong className="text-slate-900">{appointmentToDelete.date} ({appointmentToDelete.startTime})</strong>?
+              This action cannot be undone.
+            </p>
+
+            <div className="p-3 bg-surface-50 rounded-xl border border-slate-200 text-xs space-y-1">
+              <div className="text-slate-500">Service: <span className="font-semibold text-slate-800">{appointmentToDelete.serviceName}</span></div>
+              <div className="text-slate-500">Chair: <span className="font-semibold text-slate-800">{appointmentToDelete.operatoryChair}</span></div>
+              <div className="text-slate-500">Doctor: <span className="font-semibold text-slate-800">{appointmentToDelete.doctorName}</span></div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                onClick={() => setAppointmentToDelete(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 hover:bg-surface-100 rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteAppointment(appointmentToDelete.id);
+                  setAppointmentToDelete(null);
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all flex items-center gap-1.5"
+              >
+                <Trash2 size={13} />
+                <span>Delete Appointment</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

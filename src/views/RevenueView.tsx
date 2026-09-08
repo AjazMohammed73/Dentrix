@@ -8,22 +8,31 @@ import {
   Calendar,
   AlertCircle,
   FileSpreadsheet,
+  Plus,
+  Printer,
+  Share2,
+  Trash2,
 } from 'lucide-react';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { InvoiceStatus } from '../types';
+import { InvoiceStatus, Invoice } from '../types';
 import { formatINR } from '../utils/format';
 import { AccessDeniedView } from './AccessDeniedView';
+import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
+import { InvoicePrintModal } from '../components/modals/InvoicePrintModal';
 
 interface RevenueViewProps {
   onNavigateHome?: () => void;
 }
 
 export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
-  const { invoices, appointments, markInvoicePaid } = useData();
+  const { invoices, appointments, markInvoicePaid, deleteInvoice } = useData();
   const { currentUser, currentTenant } = useAuth();
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Invoice | null>(null);
 
   const canViewRevenue =
     currentUser.permissions.canViewRevenue ||
@@ -131,13 +140,22 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
           </div>
         </div>
 
-        <button
-          onClick={exportCSV}
-          className="flex items-center space-x-2 bg-surface-50 hover:bg-surface-100 text-slate-700 border border-border px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm"
-        >
-          <Download size={16} />
-          <span>Export Financials (CSV)</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-md shadow-primary-600/20"
+          >
+            <Plus size={16} />
+            <span>Create Invoice</span>
+          </button>
+          <button
+            onClick={exportCSV}
+            className="flex items-center space-x-2 bg-surface-50 hover:bg-surface-100 text-slate-700 border border-border px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm"
+          >
+            <Download size={16} />
+            <span>Export CSV</span>
+          </button>
+        </div>
       </div>
 
       {/* Daily & Monthly Stat Cards */}
@@ -304,7 +322,8 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                 <th className="py-3 px-4">Outstanding</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Settlement</th>
+                <th className="py-3 px-4">Settlement</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -333,7 +352,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                       {inv.status}
                     </Badge>
                   </td>
-                  <td className="py-3.5 px-4 text-right">
+                  <td className="py-3.5 px-4">
                     {inv.status !== 'Paid' ? (
                       <button
                         onClick={() => markInvoicePaid(inv.id, 'Credit Card')}
@@ -342,10 +361,55 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                         Mark Paid
                       </button>
                     ) : (
-                      <span className="text-[11px] font-semibold text-emerald-700 flex items-center justify-end gap-1">
+                      <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
                         <CheckCircle2 size={13} /> {inv.paymentMethod || 'Paid'}
                       </span>
                     )}
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    <div className="flex items-center justify-end space-x-1">
+                      {/* Print Button */}
+                      <button
+                        onClick={() => setSelectedInvoiceForPrint(inv)}
+                        className="p-1.5 text-slate-500 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                        title="Print / View Invoice"
+                      >
+                        <Printer size={15} />
+                      </button>
+                      {/* WhatsApp Share Button */}
+                      <button
+                        onClick={() => {
+                          const msg =
+                            `*🦷 DENTAL INVOICE RECEIPT*\n` +
+                            `*Clinic:* ${currentTenant?.name || 'Apex Dental'}\n` +
+                            `*Invoice No:* ${inv.invoiceNumber}\n` +
+                            `*Patient:* ${inv.patientName}\n` +
+                            `*Service:* ${inv.serviceName}\n` +
+                            `*Total:* ${formatINR(inv.amount)}\n` +
+                            `*Paid:* ${formatINR(inv.amountPaid)}\n` +
+                            `*Balance Due:* ${formatINR(inv.balance)}\n` +
+                            `*Status:* ${inv.status.toUpperCase()}\n` +
+                            `Thank you! • _Powered by Axiotronicx.Inc_`;
+                          window.open(`https://api.whatsapp.com/send?text=${encodeURI(msg)}`, '_blank');
+                        }}
+                        className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        title="Share via WhatsApp"
+                      >
+                        <Share2 size={15} />
+                      </button>
+                      {/* Delete Invoice Button */}
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete invoice ${inv.invoiceNumber} for ${inv.patientName}?`)) {
+                            deleteInvoice(inv.id);
+                          }
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete Invoice"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -353,6 +417,19 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
           </table>
         </div>
       </div>
+
+      {/* Create Invoice Modal */}
+      <CreateInvoiceModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
+
+      {/* Invoice Print & Preview Modal */}
+      <InvoicePrintModal
+        isOpen={!!selectedInvoiceForPrint}
+        onClose={() => setSelectedInvoiceForPrint(null)}
+        invoice={selectedInvoiceForPrint}
+      />
     </div>
   );
 };
