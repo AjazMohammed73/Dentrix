@@ -49,8 +49,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const canListUsers = (u: User | null): boolean =>
-  !!u && (u.role === 'SUPER_ADMIN' || u.role === 'DOCTOR_ADMIN' || u.permissions.canManageStaff);
+// Any authenticated member can read their clinic's user directory (e.g. to pick a
+// provider when booking). Management actions stay gated in the views + on the API.
+const canListUsers = (u: User | null): boolean => !!u;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);

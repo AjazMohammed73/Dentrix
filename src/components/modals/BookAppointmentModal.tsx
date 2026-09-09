@@ -58,31 +58,23 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     selectedDoctor?.id || 'doc_1'
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient || !selectedService) return;
+    if (!selectedPatient || !selectedService || !selectedDoctor) return;
 
     if (conflictInfo.hasConflict && !allowOverride) {
       return;
     }
 
-    addAppointment({
+    await addAppointment({
       patientId: selectedPatient.id,
-      patientName: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
-      patientPhone: selectedPatient.phone,
-      doctorId: selectedDoctor ? selectedDoctor.id : 'doc_1',
-      doctorName: selectedDoctor ? selectedDoctor.name : 'Dr. Sarah Vance, DDS',
       serviceId: selectedService.id,
-      serviceName: selectedService.name,
-      procedureCode: selectedService.code,
+      doctorId: selectedDoctor.id,
       date,
       startTime,
-      endTime: prospectiveEndTime,
-      durationMinutes: selectedService.durationMinutes,
       operatoryChair,
-      status: 'Scheduled',
-      notes: allowOverride ? `[OVERRIDE APPROVED] ${notes}` : notes,
-      fee: selectedService.basePrice,
+      notes,
+      allowOverride,
     });
 
     onClose();

@@ -117,13 +117,28 @@ Render Postgres ($7) once past a few live clinics.
 - `.env` / `.env.example` add `VITE_API_URL`; `src/vite-env.d.ts` types it.
 - `npx tsc --noEmit` and `npm run build` both pass.
 
-**Part (b) — NOT STARTED.** `src/context/DataContext.tsx` still runs on `localStorage` +
-`mockData`. Port each method to the API: patients, appointments (+ the auto-invoice is
-now server-side, so drop the client one), invoices/payments, clinical notes, services.
-Lists load per route via `useEffect`; keep method names/signatures so the views don't
-change. `BookAppointmentModal` should call `POST /appointments/check-conflict` instead
-of the local pure function; on `POST /appointments` handle the 409 conflict body.
-`RevenueView`/`AuditLogModal` CSV export still needs formula-injection escaping (PRE_LAUNCH).
+**Part (b) — DONE.** `src/context/DataContext.tsx` rewritten to hit the API:
+- On mount, `DataProvider` loads `/patients`, `/services`, `/appointments`,
+  `/clinical-notes`, and (gated) `/invoices`, `/audit-logs`. Each list load falls back
+  to `[]` on error (`safeList`). `refreshAll` re-pulls everything.
+- Every mutation calls the API then reloads the affected list(s); errors -> `window.alert`.
+  Booking reloads appointments + invoices + patients (the auto-invoice + balance move
+  are server-side now). `addInvoice` returns the created invoice for the print modal.
+- `checkAppointmentConflict` stayed a **sync pure function** over the in-memory
+  `appointments` list (advisory; the server re-checks on `POST /appointments`), so
+  `BookAppointmentModal` keeps its live warning banner. That modal now sends only
+  `{patientId, serviceId, doctorId, date, startTime, operatoryChair, notes, allowOverride}`
+  — names/times/fee are derived server-side.
+- `logAuditEvent` removed (server logs); `allPatients/allAppointments/allInvoices`
+  removed (unused); `allServices` aliases `services`. `systemHealth` is a static const.
+- `src/data/mockData.ts` deleted. `CreateInvoiceModal` awaits `addInvoice` with a
+  try/catch. `AddStaffModal`/`OnboardTenantModal` password fields from part (a).
+- Backend read-gates loosened so a receptionist can book: `GET /services` and
+  `GET /users` now need only authentication (still tenant-scoped; writes still gated).
+- `tsc` + `npm run build` pass; backend still imports.
+
+Still TODO on the frontend: `RevenueView`/`AuditLogModal` CSV export needs
+formula-injection escaping (PRE_LAUNCH); `signedAt`/timestamps render as raw ISO.
 
 ### Then — `PRE_LAUNCH.md` blockers
 Rate limiting on `/auth/login`; CSV formula-injection escaping; remove the `SignInModal`

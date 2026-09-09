@@ -60,30 +60,34 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatient) return;
 
-    const invoiceNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    try {
+      // invoiceNumber / patientName / balance are set server-side; kept here only to
+      // satisfy the Invoice shape.
+      const newInvoice = await addInvoice({
+        invoiceNumber: '',
+        patientId: selectedPatient.id,
+        patientName: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
+        serviceName,
+        amount: Number(amount),
+        amountPaid: Number(amountPaid),
+        balance: Math.max(0, Number(amount) - Number(amountPaid)),
+        date,
+        dueDate,
+        status: Number(amountPaid) >= Number(amount) ? 'Paid' : status,
+        paymentMethod: Number(amountPaid) > 0 ? paymentMethod : undefined,
+      });
 
-    const newInvoice = addInvoice({
-      invoiceNumber: invoiceNum,
-      patientId: selectedPatient.id,
-      patientName: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
-      serviceName,
-      amount: Number(amount),
-      amountPaid: Number(amountPaid),
-      balance: Math.max(0, Number(amount) - Number(amountPaid)),
-      date,
-      dueDate,
-      status: Number(amountPaid) >= Number(amount) ? 'Paid' : status,
-      paymentMethod: Number(amountPaid) > 0 ? paymentMethod : undefined,
-    });
-
-    if (onInvoiceCreated) {
-      onInvoiceCreated(newInvoice);
+      if (onInvoiceCreated) {
+        onInvoiceCreated(newInvoice);
+      }
+      onClose();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Failed to create invoice');
     }
-    onClose();
   };
 
   return (

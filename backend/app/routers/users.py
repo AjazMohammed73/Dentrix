@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..audit import record_audit
 from ..database import get_db
-from ..dependencies import require_permission, resolve_write_tenant
+from ..dependencies import CurrentUser, require_permission, resolve_write_tenant
 from ..models import DEFAULT_STAFF_PERMISSIONS, FULL_PERMISSIONS, User
 from ..schemas.user import UserCreate, UserOut, UserUpdate
 from ..security import hash_password
@@ -38,7 +38,9 @@ def _get_target(db: Session, caller: User, user_id: uuid.UUID) -> User:
 
 
 @router.get("", response_model=list[UserOut])
-def list_users(caller: ManageStaff, db: DbSession) -> list[User]:
+def list_users(caller: CurrentUser, db: DbSession) -> list[User]:
+    # Any authenticated member can see their clinic's directory (needed to pick a
+    # provider when booking). Mutations below stay behind `canManageStaff`.
     stmt = select(User).order_by(User.name)
     if caller.role != "SUPER_ADMIN":
         stmt = stmt.where(User.tenant_id == caller.tenant_id)

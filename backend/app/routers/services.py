@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..audit import record_audit
 from ..database import get_db
-from ..dependencies import require_permission, resolve_write_tenant, scoped
+from ..dependencies import CurrentUser, require_permission, resolve_write_tenant, scoped
 from ..models import Service, User
 from ..schemas.service import ServiceCreate, ServiceOut, ServiceUpdate
 
@@ -26,7 +26,8 @@ def _get_owned(db: Session, user: User, service_id: uuid.UUID) -> Service:
 
 
 @router.get("", response_model=list[ServiceOut])
-def list_services(user: ManageServices, db: DbSession) -> list[Service]:
+def list_services(user: CurrentUser, db: DbSession) -> list[Service]:
+    # Any authenticated clinic member can read the catalog (needed to book / bill).
     stmt = scoped(select(Service), Service.tenant_id, user).order_by(Service.code)
     return list(db.scalars(stmt))
 
