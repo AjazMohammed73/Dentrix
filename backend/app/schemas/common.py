@@ -21,3 +21,9 @@ ServiceCategory = Literal[
     "Oral Surgery",
     "Orthodontics",
 ]
+OperatoryChair = Literal["Chair 1 - Hygiene", "Chair 2 - Surgery", "Chair 3 - General"]
+AppointmentStatus = Literal[
+    "Scheduled", "In-Chair", "Delayed", "Completed", "Cancelled", "No-Show"
+]
+InvoiceStatus = Literal["Paid", "Pending", "Overdue"]
+InstallmentMethod = Literal["Credit Card", "Insurance", "Cash", "Debit Card", "UPI / Bank"]
