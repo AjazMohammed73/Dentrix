@@ -2,7 +2,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import appointments, auth, clinical_notes, health, invoices, patients, services
+from .routers import (
+    appointments,
+    auth,
+    clinical_notes,
+    health,
+    invoices,
+    patients,
+    services,
+    tenants,
+    users,
+)
 
 settings = get_settings()
 
@@ -19,6 +29,8 @@ app.add_middleware(
 for _router in (
     health.router,
     auth.router,
+    tenants.router,
+    users.router,
     patients.router,
     services.router,
     appointments.router,

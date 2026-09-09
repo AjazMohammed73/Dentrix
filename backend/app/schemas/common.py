@@ -11,6 +11,7 @@ class CamelModel(BaseModel):
 
 
 Role = Literal["SUPER_ADMIN", "DOCTOR_ADMIN", "STAFF"]
+UserStatus = Literal["active", "inactive", "suspended"]
 Gender = Literal["Male", "Female", "Other"]
 PatientStatus = Literal["Active", "Inactive"]
 ServiceCategory = Literal[
@@ -27,3 +28,7 @@ AppointmentStatus = Literal[
 ]
 InvoiceStatus = Literal["Paid", "Pending", "Overdue"]
 InstallmentMethod = Literal["Credit Card", "Insurance", "Cash", "Debit Card", "UPI / Bank"]
+TenantPlan = Literal["Starter", "Professional", "Enterprise"]
+TenantStatus = Literal["active", "suspended"]
+SubscriptionStatus = Literal["Active", "Trial", "Past Due", "Cancelled"]
+BillingCycle = Literal["Monthly", "Annual"]

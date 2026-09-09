@@ -18,9 +18,10 @@ app/
   main.py             app factory + CORS + router wiring
   seed.py             one-shot bootstrap Super Admin from env
   models/             base · tenant · user · patient · service · appointment · invoice · clinical_note
-  schemas/            common (CamelModel + Literals) · auth · user · patient · service
+  schemas/            common (CamelModel + Literals) · auth · user · tenant · patient · service
                       · appointment · invoice · clinical_note
-  routers/            health · auth · patients · services · appointments · invoices · clinical_notes
+  routers/            health · auth · tenants · users · patients · services · appointments
+                      · invoices · clinical_notes
 alembic/              migrations, wired to app settings in env.py
 ```
 
@@ -72,6 +73,10 @@ uvicorn app.main:app --reload --port 8000       # docs at http://127.0.0.1:8000/
 | POST | `/invoices/{id}/payments` · `/invoices/{id}/mark-paid` | `canViewRevenue` |
 | GET | `/clinical-notes` (+ `?patient_id=`) | `canManagePatients` |
 | POST | `/clinical-notes` | `canWriteDoctorNotes` |
+| GET | `/tenants` | bearer (Super Admin -> all; others -> own only) |
+| POST / PATCH | `/tenants` · `/tenants/{id}` | Super Admin (onboard; status / plan / subscription) |
+| POST | `/tenants/{id}/assign-doctor-admin` | Super Admin — `{userId}` |
+| GET / POST | `/users` · PATCH / DELETE `/users/{id}` | `canManageStaff` |
 
 Super Admin and Doctor Admin implicitly pass every `require_permission` check. Reads are
 filtered to the caller's tenant; Super Admin sees all. Writes are locked to the caller's
@@ -91,5 +96,4 @@ balance in the same transaction. Clinical notes and payment installments are app
 
 ## Next
 
-Per `../CONTEXT.md`: tenants router -> users/staff router -> server-side audit log ->
-wire the frontend contexts to the API.
+Per `../CONTEXT.md`: server-side audit log -> wire the frontend contexts to the API.
