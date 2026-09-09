@@ -4,6 +4,26 @@ FastAPI backend for the Dentrix dental-clinic admin app.
 
 Stack: FastAPI · SQLAlchemy 2.0 (sync) · psycopg3 · Alembic · Neon Postgres · JWT (Argon2id).
 
+## Layout
+
+```
+app/
+  config.py          settings (pydantic-settings); normalises the Neon URL, parses CORS_ORIGINS
+  database.py         sync engine + session (pool_pre_ping survives Neon autosuspend)
+  security.py         Argon2id hash/verify + JWT encode/decode  (self-check: python -m app.security)
+  dependencies.py     get_current_user, require_permission(perm), require_super_admin,
+                      scoped() query filter, resolve_write_tenant()
+  main.py             app factory + CORS + router wiring
+  seed.py             one-shot bootstrap Super Admin from env
+  models/             base.py · tenant.py · user.py · patient.py · service.py
+  schemas/            common.py (CamelModel + Literals) · auth.py · user.py · patient.py · service.py
+  routers/            health.py · auth.py · patients.py · services.py
+alembic/              migrations, wired to app settings in env.py
+```
+
+Wire format is **camelCase** (matches the frontend TS types); Python stays snake_case
+via `CamelModel`. Money is stored as **whole INR integers**.
+
 ## Local setup
 
 ```bash
@@ -31,15 +51,24 @@ On later model changes: `alembic revision --autogenerate -m "..."` then `alembic
 ## Run
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000       # docs at http://127.0.0.1:8000/docs
 ```
 
-- Docs: http://127.0.0.1:8000/docs
-- `GET /health` — DB ping
-- `POST /auth/login` — `{ "email", "password" }` -> `{ access_token, user }`
-- `GET /auth/me` — requires `Authorization: Bearer <token>`
+### Endpoints
 
-Self-check for the crypto layer: `python -m app.security`
+| Method | Path | Auth |
+|---|---|---|
+| GET | `/health` | none — DB ping |
+| POST | `/auth/login` | none — `{email, password}` -> `{accessToken, user}` |
+| GET | `/auth/me` | bearer |
+| GET / POST | `/patients` | `canManagePatients` (tenant-scoped) |
+| PATCH | `/patients/{id}` | `canManagePatients` |
+| GET / POST | `/services` | `canManageServices` (tenant-scoped; unique CDT code per clinic) |
+| PATCH | `/services/{id}` | `canManageServices` (also handles active/archive toggle) |
+
+Super Admin and Doctor Admin implicitly pass every `require_permission` check.
+Reads are filtered to the caller's tenant; Super Admin sees all. Writes are locked
+to the caller's tenant (Super Admin must pass `tenantId` in the body).
 
 ## Deploy (Render)
 
@@ -54,9 +83,9 @@ Self-check for the crypto layer: `python -m app.security`
 
 ## Status
 
-Implemented: config, DB, `Tenant` + `User` models, auth (login, me), permission
-dependencies, health, seed.
+Done: config, DB, models (Tenant/User/Patient/Service), auth (login, me), permission
+dependencies, health, seed, patients CRUD, services CRUD.
 
-Next: patients → appointments (+ auto-invoice) → services → clinical notes →
-invoices/payments → audit log. Then wire the frontend `AuthContext`/`DataContext`
-to these endpoints.
+Next: appointments (+ auto-invoice + conflict check) -> clinical notes -> invoices /
+payments -> tenants + staff/users -> server-side audit log. Then point the frontend
+`AuthContext`/`DataContext` at these endpoints.

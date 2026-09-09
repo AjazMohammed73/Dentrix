@@ -6,7 +6,7 @@ Run once after migrations:  python -m app.seed
 from sqlalchemy import func, select
 
 from .config import get_settings
-from .db import SessionLocal
+from .database import SessionLocal
 from .models import FULL_PERMISSIONS, User
 from .security import hash_password
 

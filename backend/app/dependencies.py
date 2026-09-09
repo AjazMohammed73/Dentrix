@@ -5,14 +5,14 @@ from typing import Annotated
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import Select
 from sqlalchemy.orm import Session
 
-from .db import get_db
+from .database import get_db
 from .models import User
 from .security import decode_access_token
 
 _bearer = HTTPBearer(auto_error=True)
-
 _ADMIN_ROLES = {"SUPER_ADMIN", "DOCTOR_ADMIN"}
 
 
@@ -35,8 +35,8 @@ def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def require_permission(perm: str) -> Callable[[User], User]:
-    """Super Admin and Doctor Admin implicitly hold every permission (matches the frontend)."""
+def require_permission(perm: str) -> Callable[..., User]:
+    """Super Admin and Doctor Admin implicitly hold every permission (mirrors the frontend)."""
 
     def checker(user: CurrentUser) -> User:
         if user.role in _ADMIN_ROLES:
@@ -54,6 +54,19 @@ def require_super_admin(user: CurrentUser) -> User:
     return user
 
 
-def tenant_scope(user: User) -> uuid.UUID | None:
-    """The tenant a query must be filtered to. None => Super Admin, no filter."""
-    return None if user.role == "SUPER_ADMIN" else user.tenant_id
+def scoped(stmt: Select, tenant_column, user: User) -> Select:
+    """Constrain a SELECT to the caller's tenant. Super Admin sees everything."""
+    if user.role != "SUPER_ADMIN":
+        return stmt.where(tenant_column == user.tenant_id)
+    return stmt
+
+
+def resolve_write_tenant(user: User, body_tenant_id: uuid.UUID | None) -> uuid.UUID:
+    """Which tenant a create/update targets. Clinic users are locked to their own tenant."""
+    if user.role != "SUPER_ADMIN":
+        return user.tenant_id  # type: ignore[return-value]
+    if body_tenant_id is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "tenant_id is required for Super Admin writes"
+        )
+    return body_tenant_id
