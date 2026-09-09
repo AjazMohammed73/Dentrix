@@ -10,7 +10,7 @@ interface SignInModalProps {
 }
 
 export const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { loginWithCredentials, allUsers } = useAuth();
+  const { loginWithCredentials } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('Password123!');
   const [showPassword, setShowPassword] = useState(false);

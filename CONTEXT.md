@@ -95,15 +95,40 @@ Render Postgres ($7) once past a few live clinics.
     never client-supplied identity. Model `audit_logs` has **no FKs** (survives
     user/tenant deletion) and no update/delete code paths.
 
-### Not started — roughly in order
-1. **Wire the frontend** — replace `context/AuthContext.tsx` and
-   `context/DataContext.tsx` `localStorage` logic with `fetch` to the API.
-   Add `VITE_API_URL`. Store the JWT (memory + `sessionStorage`), attach as
-   `Authorization` header. Keep the same context method names so views don't change.
-   Drop the tenant switcher and role switcher (demo-only, like the removed mock data).
-2. **Then** the `PRE_LAUNCH.md` blockers: rate limiting on `/auth/login`, CSV
-   formula-injection escaping, remove the frontend role switcher + demo accounts,
-   drop the unbacked HIPAA/RLS claims, `ErrorBoundary` reset-cache wording, etc.
+### Frontend wiring — in progress
+
+**Part (a) — DONE.** Auth + users + tenants now run against the API:
+- `src/lib/api.ts` — `fetch` wrapper: `VITE_API_URL` base, `Bearer` token from
+  `sessionStorage` (`dentrix_token`), `ApiError` (carries `status` + `detail`),
+  fires a `dentrix:unauthorized` window event on 401.
+- `src/context/AuthContext.tsx` — rewritten. `loginWithCredentials` -> `POST /auth/login`;
+  `/auth/me` on mount if a token exists; `loading` flag; `currentTenant` from
+  `GET /tenants`; `allUsers`/`allTenants` from `GET /users`/`GET /tenants`. All the
+  users/tenants mutations call the API then reload the list; errors surface via
+  `window.alert`. Dropped: `initialUsers`/`initialTenants`, all `localStorage`,
+  `loginWithEmail`, `switchRole`, `switchTenant`.
+- `src/App.tsx` — `loading` splash; workspace renders only when `isAuthenticated`;
+  `DataProvider` moved to wrap only the workspace subtree (so `DataContext` never
+  mounts without a user).
+- `src/components/layout/TopHeader.tsx` — role-switcher pill bar and tenant `<select>`
+  removed; non-super users see a static clinic-name chip.
+- `AddStaffModal` / `OnboardTenantModal` gained a required password field (the API
+  needs one; proper invite-email flow is later) and call the new context signatures.
+- `.env` / `.env.example` add `VITE_API_URL`; `src/vite-env.d.ts` types it.
+- `npx tsc --noEmit` and `npm run build` both pass.
+
+**Part (b) — NOT STARTED.** `src/context/DataContext.tsx` still runs on `localStorage` +
+`mockData`. Port each method to the API: patients, appointments (+ the auto-invoice is
+now server-side, so drop the client one), invoices/payments, clinical notes, services.
+Lists load per route via `useEffect`; keep method names/signatures so the views don't
+change. `BookAppointmentModal` should call `POST /appointments/check-conflict` instead
+of the local pure function; on `POST /appointments` handle the 409 conflict body.
+`RevenueView`/`AuditLogModal` CSV export still needs formula-injection escaping (PRE_LAUNCH).
+
+### Then — `PRE_LAUNCH.md` blockers
+Rate limiting on `/auth/login`; CSV formula-injection escaping; remove the `SignInModal`
+demo-account quick-fill; drop the unbacked HIPAA/RLS claims; `ErrorBoundary` reset-cache
+wording; etc. (The role switcher was already removed in part (a).)
 
 ---
 

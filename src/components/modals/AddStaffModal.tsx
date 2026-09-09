@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, UserPlus, Shield, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole, UserPermissions } from '../../types';
+import { UserPermissions } from '../../types';
+
+type StaffRole = 'STAFF' | 'DOCTOR_ADMIN';
 
 interface AddStaffModalProps {
   isOpen: boolean;
@@ -15,7 +17,8 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose })
   const [email, setEmail] = useState('');
   const [title, setTitle] = useState('Front Desk Receptionist');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<UserRole>('STAFF');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<StaffRole>('STAFF');
   const [permissions, setPermissions] = useState<UserPermissions>({
     canManageAppointments: true,
     canManagePatients: true,
@@ -34,7 +37,7 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose })
     }));
   };
 
-  const handleRoleChange = (newRole: UserRole) => {
+  const handleRoleChange = (newRole: StaffRole) => {
     setRole(newRole);
     if (newRole === 'DOCTOR_ADMIN') {
       setPermissions({
@@ -62,14 +65,14 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose })
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     addStaffMember({
-      tenantId: currentTenant?.id || 'tenant_apex',
+      tenantId: currentTenant?.id,
       name: name.trim(),
       email: email.trim(),
       role,
       title: title.trim(),
       phone: phone.trim(),
       permissions,
-      status: 'active',
+      password,
     });
     onClose();
   };
@@ -131,7 +134,7 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose })
               <label className="block text-xs font-semibold text-slate-700 mb-1">Clinic Role</label>
               <select
                 value={role}
-                onChange={(e) => handleRoleChange(e.target.value as UserRole)}
+                onChange={(e) => handleRoleChange(e.target.value as StaffRole)}
                 className="w-full bg-surface-50 border border-border rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-primary-600"
               >
                 <option value="STAFF">Staff (Scoped)</option>
@@ -152,15 +155,29 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose })
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
-            <input
-              type="tel"
-              placeholder="(512) 555-0144"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full bg-surface-50 border border-border rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-primary-600"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+              <input
+                type="tel"
+                placeholder="(512) 555-0144"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full bg-surface-50 border border-border rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-primary-600"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Temporary Password</label>
+              <input
+                type="text"
+                required
+                minLength={8}
+                placeholder="min. 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-surface-50 border border-border rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-primary-600 font-mono"
+              />
+            </div>
           </div>
 
           {/* Granular Permission Toggles */}

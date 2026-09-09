@@ -27,7 +27,7 @@ import { InvoicePrintModal } from './components/modals/InvoicePrintModal';
 import { Invoice } from './types';
 
 const AppContent: React.FC = () => {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const [showLandingPage, setShowLandingPage] = useState<boolean>(true);
   const [isSignInOpen, setIsSignInOpen] = useState<boolean>(false);
   const [currentRoute, setCurrentRoute] = useState<NavRoute>('dashboard');
@@ -80,7 +80,15 @@ const AppContent: React.FC = () => {
     setShowLandingPage(true);
   };
 
-  if (showLandingPage) {
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#F8F9FA] text-slate-500 text-sm font-semibold">
+        Loading Dentrix…
+      </div>
+    );
+  }
+
+  if (showLandingPage || !isAuthenticated) {
     return (
       <>
         <LandingPageView
@@ -100,148 +108,148 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] text-slate-800">
-      {/* Persistent Left Sidebar */}
-      <Sidebar
-        currentRoute={currentRoute}
-        onNavigate={handleNavigate}
-        onSignOut={handleSignOut}
-      />
-
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Header */}
-        <TopHeader
-          onQuickBook={handleQuickBook}
-          onOpenCreateInvoice={() => handleOpenCreateInvoice()}
-          onViewLandingPage={() => setShowLandingPage(true)}
+    <DataProvider>
+      <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] text-slate-800">
+        {/* Persistent Left Sidebar */}
+        <Sidebar
+          currentRoute={currentRoute}
+          onNavigate={handleNavigate}
           onSignOut={handleSignOut}
         />
 
-        {/* Dynamic Route Content */}
-        <main className="flex-1 overflow-y-auto">
-          {/* Patient Detail Sub-route */}
-          {selectedPatientId ? (
-            <PatientDetailView
-              patientId={selectedPatientId}
-              onBack={() => setSelectedPatientId(null)}
-              onBookAppointment={handleBookForPatient}
-              onOpenCreateInvoice={handleOpenCreateInvoice}
-            />
-          ) : (
-            <>
-              {currentRoute === 'dashboard' && (
-                <DashboardView
-                  onNavigate={handleNavigate}
-                  onBookAppointment={handleQuickBook}
-                  onSelectPatient={handleSelectPatient}
-                  onOpenCreateInvoice={() => handleOpenCreateInvoice()}
-                />
-              )}
+        {/* Main Container */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Top Header */}
+          <TopHeader
+            onQuickBook={handleQuickBook}
+            onOpenCreateInvoice={() => handleOpenCreateInvoice()}
+            onViewLandingPage={() => setShowLandingPage(true)}
+            onSignOut={handleSignOut}
+          />
 
-              {currentRoute === 'appointments' && (
-                <AppointmentsView
-                  onBookAppointment={handleQuickBook}
-                  onSelectPatient={handleSelectPatient}
-                />
-              )}
+          {/* Dynamic Route Content */}
+          <main className="flex-1 overflow-y-auto">
+            {/* Patient Detail Sub-route */}
+            {selectedPatientId ? (
+              <PatientDetailView
+                patientId={selectedPatientId}
+                onBack={() => setSelectedPatientId(null)}
+                onBookAppointment={handleBookForPatient}
+                onOpenCreateInvoice={handleOpenCreateInvoice}
+              />
+            ) : (
+              <>
+                {currentRoute === 'dashboard' && (
+                  <DashboardView
+                    onNavigate={handleNavigate}
+                    onBookAppointment={handleQuickBook}
+                    onSelectPatient={handleSelectPatient}
+                    onOpenCreateInvoice={() => handleOpenCreateInvoice()}
+                  />
+                )}
 
-              {currentRoute === 'patients' && (
-                <PatientsView
-                  onSelectPatient={handleSelectPatient}
-                  onOpenAddPatient={() => setIsAddPatientOpen(true)}
-                  onOpenCreateInvoice={handleOpenCreateInvoice}
-                />
-              )}
+                {currentRoute === 'appointments' && (
+                  <AppointmentsView
+                    onBookAppointment={handleQuickBook}
+                    onSelectPatient={handleSelectPatient}
+                  />
+                )}
 
-              {currentRoute === 'revenue' && (
-                <RevenueView onNavigateHome={() => handleNavigate('dashboard')} />
-              )}
+                {currentRoute === 'patients' && (
+                  <PatientsView
+                    onSelectPatient={handleSelectPatient}
+                    onOpenAddPatient={() => setIsAddPatientOpen(true)}
+                    onOpenCreateInvoice={handleOpenCreateInvoice}
+                  />
+                )}
 
-              {currentRoute === 'staff' && (
-                <StaffView
-                  onOpenAddStaff={() => setIsAddStaffOpen(true)}
-                  onNavigateHome={() => handleNavigate('dashboard')}
-                />
-              )}
+                {currentRoute === 'revenue' && (
+                  <RevenueView onNavigateHome={() => handleNavigate('dashboard')} />
+                )}
 
-              {currentRoute === 'services' && (
-                <ServicesView
-                  onOpenAddService={() => setIsAddServiceOpen(true)}
-                  onNavigateHome={() => handleNavigate('dashboard')}
-                />
-              )}
+                {currentRoute === 'staff' && (
+                  <StaffView
+                    onOpenAddStaff={() => setIsAddStaffOpen(true)}
+                    onNavigateHome={() => handleNavigate('dashboard')}
+                  />
+                )}
 
-              {currentRoute === 'tenants' && (
-                <SuperAdminView
-                  onOpenOnboardModal={() => setIsOnboardTenantOpen(true)}
-                  onNavigateHome={() => handleNavigate('dashboard')}
-                />
-              )}
-            </>
-          )}
-        </main>
+                {currentRoute === 'services' && (
+                  <ServicesView
+                    onOpenAddService={() => setIsAddServiceOpen(true)}
+                    onNavigateHome={() => handleNavigate('dashboard')}
+                  />
+                )}
+
+                {currentRoute === 'tenants' && (
+                  <SuperAdminView
+                    onOpenOnboardModal={() => setIsOnboardTenantOpen(true)}
+                    onNavigateHome={() => handleNavigate('dashboard')}
+                  />
+                )}
+              </>
+            )}
+          </main>
+        </div>
+
+        {/* Global Modals */}
+        <SignInModal
+          isOpen={isSignInOpen}
+          onClose={() => setIsSignInOpen(false)}
+          onSuccess={() => setIsSignInOpen(false)}
+        />
+        <BookAppointmentModal
+          isOpen={isBookModalOpen}
+          onClose={() => setIsBookModalOpen(false)}
+          initialPatientId={bookModalPatientId}
+        />
+
+        <AddPatientModal
+          isOpen={isAddPatientOpen}
+          onClose={() => setIsAddPatientOpen(false)}
+        />
+
+        <AddServiceModal
+          isOpen={isAddServiceOpen}
+          onClose={() => setIsAddServiceOpen(false)}
+        />
+
+        <AddStaffModal
+          isOpen={isAddStaffOpen}
+          onClose={() => setIsAddStaffOpen(false)}
+        />
+
+        <OnboardTenantModal
+          isOpen={isOnboardTenantOpen}
+          onClose={() => setIsOnboardTenantOpen(false)}
+        />
+
+        <CreateInvoiceModal
+          isOpen={isCreateInvoiceOpen}
+          onClose={() => {
+            setIsCreateInvoiceOpen(false);
+            setCreateInvoicePatientId(undefined);
+          }}
+          initialPatientId={createInvoicePatientId}
+          onInvoiceCreated={(invoice) => {
+            setCreatedInvoiceForPrint(invoice);
+          }}
+        />
+
+        <InvoicePrintModal
+          isOpen={!!createdInvoiceForPrint}
+          onClose={() => setCreatedInvoiceForPrint(null)}
+          invoice={createdInvoiceForPrint}
+        />
       </div>
-
-      {/* Global Modals */}
-      <SignInModal
-        isOpen={isSignInOpen}
-        onClose={() => setIsSignInOpen(false)}
-        onSuccess={() => setIsSignInOpen(false)}
-      />
-      <BookAppointmentModal
-        isOpen={isBookModalOpen}
-        onClose={() => setIsBookModalOpen(false)}
-        initialPatientId={bookModalPatientId}
-      />
-
-      <AddPatientModal
-        isOpen={isAddPatientOpen}
-        onClose={() => setIsAddPatientOpen(false)}
-      />
-
-      <AddServiceModal
-        isOpen={isAddServiceOpen}
-        onClose={() => setIsAddServiceOpen(false)}
-      />
-
-      <AddStaffModal
-        isOpen={isAddStaffOpen}
-        onClose={() => setIsAddStaffOpen(false)}
-      />
-
-      <OnboardTenantModal
-        isOpen={isOnboardTenantOpen}
-        onClose={() => setIsOnboardTenantOpen(false)}
-      />
-
-      <CreateInvoiceModal
-        isOpen={isCreateInvoiceOpen}
-        onClose={() => {
-          setIsCreateInvoiceOpen(false);
-          setCreateInvoicePatientId(undefined);
-        }}
-        initialPatientId={createInvoicePatientId}
-        onInvoiceCreated={(invoice) => {
-          setCreatedInvoiceForPrint(invoice);
-        }}
-      />
-
-      <InvoicePrintModal
-        isOpen={!!createdInvoiceForPrint}
-        onClose={() => setCreatedInvoiceForPrint(null)}
-        invoice={createdInvoiceForPrint}
-      />
-    </div>
+    </DataProvider>
   );
 };
 
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <DataProvider>
-        <AppContent />
-      </DataProvider>
+      <AppContent />
     </AuthProvider>
   );
 };
