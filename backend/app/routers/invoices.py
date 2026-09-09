@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..audit import record_audit
 from ..billing import apply_patient_balance, next_invoice_number, recompute_invoice
 from ..database import get_db
-from ..dependencies import require_permission, scoped
+from ..dependencies import require_billing_access, require_permission, scoped
 from ..models import Invoice, Patient, PaymentInstallment, User
 from ..schemas.common import InstallmentMethod
 from ..schemas.invoice import InvoiceCreate, InvoiceOut, InvoicePaymentRequest
@@ -17,6 +17,7 @@ from ..schemas.invoice import InvoiceCreate, InvoiceOut, InvoicePaymentRequest
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
 ViewRevenue = Annotated[User, Depends(require_permission("canViewRevenue"))]
+Billing = Annotated[User, Depends(require_billing_access)]
 DbSession = Annotated[Session, Depends(get_db)]
 
 
@@ -59,7 +60,7 @@ def list_invoices(user: ViewRevenue, db: DbSession) -> list[Invoice]:
 
 @router.post("", response_model=InvoiceOut, status_code=status.HTTP_201_CREATED)
 def create_invoice(
-    body: InvoiceCreate, request: Request, user: ViewRevenue, db: DbSession
+    body: InvoiceCreate, request: Request, user: Billing, db: DbSession
 ) -> Invoice:
     if user.role == "SUPER_ADMIN":
         raise HTTPException(

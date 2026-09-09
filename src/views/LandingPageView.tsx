@@ -54,8 +54,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
 
   const faqs = [
     {
-      q: 'How does multi-tenant data partitioning protect patient confidentiality and HIPAA compliance?',
-      a: 'Dentrix enforces row-level security and tenant_id isolation across all clinical records, appointments, and billing tables. Each clinic operates inside its own cryptographic logical boundary, verified by Super Admin governance.',
+      q: 'How is each clinic’s patient data kept separate from other clinics?',
+      a: 'Every clinical record, appointment and invoice is tagged with a tenant_id, and the API filters every read and write to the signed-in user’s clinic — cross-clinic access is not possible through the application. Role-based access control (Super Admin, Doctor Admin, Staff) further limits what each user can see, and administrative actions are written to an append-only audit trail.',
     },
     {
       q: 'Can front desk receptionists schedule visits without seeing clinic revenue and financial metrics?',
@@ -410,7 +410,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                   Interactive 32-Tooth Digital Charting & Doctor Notes
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Provide dental surgeons with an intuitive 32-tooth interactive visual chart (Upper Maxillary #1–#16, Lower Mandibular #32–#17). Record vital signs, local anesthetics, and append cryptographically signed clinical notes.
+                  Provide dental surgeons with an intuitive 32-tooth interactive visual chart (Upper Maxillary #1–#16, Lower Mandibular #32–#17). Record vital signs, local anesthetics, and append electronically signed, locked clinical notes.
                 </p>
                 <ul className="space-y-2 text-xs text-slate-700 font-semibold">
                   <li className="flex items-center gap-2">
@@ -830,7 +830,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
               <li><a href="#features" className="hover:text-white">Super Admin Cloud Console</a></li>
               <li><a href="#pricing" className="hover:text-white">Subscription Management</a></li>
               <li><a href="#features" className="hover:text-white">Staff RBAC & Scoped Access</a></li>
-              <li><a href="#faq" className="hover:text-white">HIPAA & Tenant Partitioning</a></li>
+              <li><a href="#faq" className="hover:text-white">Tenant Isolation & RBAC</a></li>
             </ul>
           </div>
 

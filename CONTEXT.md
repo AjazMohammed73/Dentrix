@@ -73,8 +73,10 @@ Render Postgres ($7) once past a few live clinics.
   - `appointments`: GET (`?date=`, `?patient_id=`) / POST / PATCH / DELETE
     + `POST /appointments/check-conflict`. POST auto-creates the pending invoice and
     bumps `patient.balance`, in one transaction, retrying once on invoice-number races.
-  - `invoices`: GET / POST / DELETE + `POST /{id}/payments` + `POST /{id}/mark-paid`
-    (`canViewRevenue`). Payments write an installment, recompute balance/status, and
+  - `invoices`: `POST` needs **billing access** (`canManagePatients` OR `canViewRevenue`
+    — front-desk staff raise invoices without seeing revenue reports); `GET` / `DELETE` /
+    `POST /{id}/payments` / `POST /{id}/mark-paid` stay behind `canViewRevenue` (only
+    reachable from RevenueView). Payments write an installment, recompute balance/status,
     adjust `patient.balance`.
   - `clinical_notes`: GET (`?patient_id=`) / POST  (read = `canManagePatients`,
     write = `canWriteDoctorNotes`)
@@ -140,10 +142,32 @@ Render Postgres ($7) once past a few live clinics.
 Still TODO on the frontend: `RevenueView`/`AuditLogModal` CSV export needs
 formula-injection escaping (PRE_LAUNCH); `signedAt`/timestamps render as raw ISO.
 
-### Then — `PRE_LAUNCH.md` blockers
-Rate limiting on `/auth/login`; CSV formula-injection escaping; remove the `SignInModal`
-demo-account quick-fill; drop the unbacked HIPAA/RLS claims; `ErrorBoundary` reset-cache
-wording; etc. (The role switcher was already removed in part (a).)
+### PRE_LAUNCH blockers — DONE (2026-09-10)
+- **Rate limit** `/auth/login`: `backend/app/ratelimit.py` — in-memory sliding window,
+  10 / 5 min / IP, 429 + `Retry-After`. (`ponytail`: per-process; slowapi+Redis if >1 instance.)
+- **CSV formula-injection**: `src/utils/csv.ts` (`csvCell` prefixes `'` on `= + - @`,
+  `toCsv`, `downloadCsv` via Blob). Used in `RevenueView.exportCSV` + `AuditLogModal`.
+- **`SignInModal`**: demo-account quick-fill + prefilled password removed; honest footer copy.
+- **Unbacked claims**: `LandingPageView` FAQ + footer reworded (no "HIPAA compliance",
+  "row-level security", "cryptographic boundary"); "cryptographically signed" notes ->
+  "electronically signed, locked"; `OnboardTenantModal` already accurate. Root `README.md`
+  had a stray UTF-16 tail — stripped; it has no false claims.
+- **`ErrorBoundary`**: reset button now "Sign Out & Reload" (clears `dentrix_token`),
+  wording says server data is unaffected.
+- Still MANUAL: audit `REVOKE UPDATE, DELETE` — needs a low-priv DB role (not the Neon
+  owner). SQL is in `backend/README.md`; do it at deploy.
+
+### Deploy config — DONE
+- `backend/render.yaml` — Render Blueprint (web service, `rootDir: backend`, build /
+  preDeploy `alembic upgrade head` / start / health `/health`, env-var placeholders).
+- Vercel: no config file needed (auto-detects Vite); set `VITE_API_URL` to the Render URL
+  in the Vercel dashboard.
+
+### Demo data
+- `backend/app/seed_demo.py` — `python -m app.seed_demo` (no-op if the clinic exists).
+  Seeds Apex Dental Studio + `dr.vance@apexdental.com` / `emma.reception@apexdental.com`
+  (both `Password123!`), 8 CDT services, 3 patients, 2 appointments (+ their auto-invoices).
+  Already run against the live Neon DB.
 
 ---
 

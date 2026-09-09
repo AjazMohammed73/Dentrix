@@ -62,6 +62,17 @@ def require_audit_access(user: CurrentUser) -> User:
     return user
 
 
+def require_billing_access(user: CurrentUser) -> User:
+    """Front-desk billing: raising an invoice is a receptionist task even when the
+    revenue *reports* screen is restricted. Revenue analytics stays behind
+    `canViewRevenue` in the view + on GET/payments/delete."""
+    if user.role in _ADMIN_ROLES:
+        return user
+    if user.permissions.get("canViewRevenue") or user.permissions.get("canManagePatients"):
+        return user
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Billing access required")
+
+
 def scoped(stmt: Select, tenant_column, user: User) -> Select:
     """Constrain a SELECT to the caller's tenant. Super Admin sees everything."""
     if user.role != "SUPER_ADMIN":

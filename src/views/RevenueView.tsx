@@ -20,6 +20,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { InvoiceStatus, Invoice, PaymentInstallment } from '../types';
 import { formatINR } from '../utils/format';
+import { toCsv, downloadCsv } from '../utils/csv';
 import { AccessDeniedView } from './AccessDeniedView';
 import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
 import { InvoicePrintModal } from '../components/modals/InvoicePrintModal';
@@ -108,25 +109,20 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
   });
 
   const exportCSV = () => {
-    const headers = ['Invoice Number', 'Patient', 'Service', 'Amount', 'Amount Paid', 'Balance', 'Date', 'Status'];
-    const rows = filteredInvoices.map((i) => [
-      i.invoiceNumber,
-      `"${i.patientName}"`,
-      `"${i.serviceName}"`,
-      i.amount,
-      i.amountPaid,
-      i.balance,
-      i.date,
-      i.status,
+    const csv = toCsv([
+      ['Invoice Number', 'Patient', 'Service', 'Amount', 'Amount Paid', 'Balance', 'Date', 'Status'],
+      ...filteredInvoices.map((i) => [
+        i.invoiceNumber,
+        i.patientName,
+        i.serviceName,
+        i.amount,
+        i.amountPaid,
+        i.balance,
+        i.date,
+        i.status,
+      ]),
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Dentrix_Revenue_${currentTenant?.slug || 'clinic'}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(`Dentrix_Revenue_${currentTenant?.slug || 'clinic'}.csv`, csv);
   };
 
   return (

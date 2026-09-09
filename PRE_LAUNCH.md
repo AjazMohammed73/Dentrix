@@ -1,11 +1,18 @@
 # Must Change Before Going Live
 
-This repo is currently a **frontend-only demo**. All data lives in `localStorage`,
-"auth" is fake, and RBAC is enforced only in the browser. Everything below has to
-change before real clinics and real patient data touch it.
+> **Status (2026-09-10):** most of this is now done. A real FastAPI + Postgres
+> backend exists (`backend/`), the frontend runs entirely on it, auth is real
+> (JWT + Argon2id), RBAC + tenant isolation are enforced server-side, there's an
+> append-only audit log, `/auth/login` is rate-limited, CSV exports are
+> injection-safe, demo accounts and unbacked HIPAA/RLS claims are gone. See
+> `CONTEXT.md` for the full picture.
+>
+> **Still open:** run the audit-table `REVOKE` on a low-priv DB role at deploy;
+> money is stored as whole-INR integers (fine for INR, revisit for sub-rupee);
+> `Date.now()`/count-based ID + invoice-number schemes (low risk at this scale);
+> soft-delete instead of hard delete; pagination on long lists.
 
-Ordering: **Blockers** stop launch. **Backend** is the work to build. **Data /
-correctness** are bugs that corrupt records. **Ops** is deployment config.
+Original checklist below — items marked here are the ones that still need doing.
 
 ---
 

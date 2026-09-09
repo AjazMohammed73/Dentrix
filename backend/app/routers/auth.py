@@ -8,6 +8,7 @@ from ..audit import record_audit
 from ..database import get_db
 from ..dependencies import CurrentUser
 from ..models import User
+from ..ratelimit import rate_limit
 from ..schemas.auth import LoginRequest, TokenResponse
 from ..schemas.user import UserOut
 from ..security import create_access_token, verify_password
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def login(
     body: LoginRequest, request: Request, db: Annotated[Session, Depends(get_db)]
 ) -> TokenResponse:
+    rate_limit(request, key="login", limit=10, window_seconds=300)  # 10 / 5 min / IP
     email = body.email.strip().lower()
     user = db.scalar(select(User).where(func.lower(User.email) == email))
 
