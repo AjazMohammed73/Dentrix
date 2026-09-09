@@ -19,11 +19,14 @@ class PaymentInstallmentOut(CamelModel):
     notes: str | None
 
 
+_MAX_MONEY = 100_000_000  # ₹10 crore — far above any real dental invoice; guards int32 overflow
+
+
 class InvoiceCreate(CamelModel):
     patient_id: uuid.UUID
     service_name: str = Field(min_length=1, max_length=300)
-    amount: int = Field(ge=0)
-    amount_paid: int = Field(default=0, ge=0)
+    amount: int = Field(ge=0, le=_MAX_MONEY)
+    amount_paid: int = Field(default=0, ge=0, le=_MAX_MONEY)
     date: date
     due_date: date
     status: InvoiceStatus = "Pending"
@@ -31,9 +34,9 @@ class InvoiceCreate(CamelModel):
 
 
 class InvoicePaymentRequest(CamelModel):
-    amount: int = Field(gt=0)
+    amount: int = Field(gt=0, le=_MAX_MONEY)
     method: InstallmentMethod
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=1000)
 
 
 class InvoiceOut(CamelModel):

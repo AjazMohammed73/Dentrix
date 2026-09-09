@@ -11,8 +11,8 @@ class ServiceBase(CamelModel):
     name: str = Field(min_length=1, max_length=200)
     category: ServiceCategory = "Preventive"
     duration_minutes: int = Field(default=30, ge=0, le=600)
-    base_price: int = Field(default=0, ge=0)
-    description: str = ""
+    base_price: int = Field(default=0, ge=0, le=100_000_000)
+    description: str = Field(default="", max_length=2000)
     is_active: bool = True
 
 
@@ -26,8 +26,8 @@ class ServiceUpdate(CamelModel):
     name: str | None = Field(default=None, max_length=200)
     category: ServiceCategory | None = None
     duration_minutes: int | None = Field(default=None, ge=0, le=600)
-    base_price: int | None = Field(default=None, ge=0)
-    description: str | None = None
+    base_price: int | None = Field(default=None, ge=0, le=100_000_000)
+    description: str | None = Field(default=None, max_length=2000)
     is_active: bool | None = None
 
 

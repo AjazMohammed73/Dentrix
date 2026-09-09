@@ -214,8 +214,8 @@ export const OnboardTenantModal: React.FC<OnboardTenantModalProps> = ({ isOpen, 
                 <input
                   type="text"
                   required
-                  minLength={8}
-                  placeholder="min. 8 characters — share securely with the doctor"
+                  minLength={12}
+                  placeholder="min. 12 characters — share securely with the doctor"
                   value={doctorPassword}
                   onChange={(e) => setDoctorPassword(e.target.value)}
                   className="w-full bg-surface-50 border border-border rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-primary-600 font-mono"

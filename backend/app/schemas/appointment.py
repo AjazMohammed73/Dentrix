@@ -13,13 +13,13 @@ class AppointmentCreate(CamelModel):
     date: date
     start_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     operatory_chair: OperatoryChair
-    notes: str = ""
+    notes: str = Field(default="", max_length=2000)
     allow_override: bool = False  # book anyway despite a scheduling conflict
 
 
 class AppointmentUpdate(CamelModel):
     status: AppointmentStatus | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class AppointmentOut(CamelModel):

@@ -36,6 +36,11 @@ _SERVICES = [
 
 
 def main() -> None:
+    from .config import get_settings
+
+    if get_settings().env == "production":
+        raise SystemExit("Refusing to seed demo data (with weak demo passwords) in production.")
+
     with SessionLocal() as db:
         if db.scalar(select(Tenant).where(Tenant.slug == SLUG)):
             print("Demo clinic already exists; nothing to do.")

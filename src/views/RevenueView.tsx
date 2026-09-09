@@ -405,7 +405,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                             `*Balance Due:* ${formatINR(inv.balance)}\n` +
                             `*Status:* ${inv.status.toUpperCase()}\n` +
                             `Thank you! • _Powered by Axiotronicx.Inc_`;
-                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
                         }}
                         className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                         title="Share via WhatsApp"

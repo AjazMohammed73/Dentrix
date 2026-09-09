@@ -11,7 +11,7 @@ from ..models import User
 from ..ratelimit import check_rate_limit, record_attempt
 from ..schemas.auth import LoginRequest, TokenResponse
 from ..schemas.user import UserOut
-from ..security import create_access_token, verify_password
+from ..security import DUMMY_HASH, create_access_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -27,8 +27,10 @@ def login(
 
     user = db.scalar(select(User).where(func.lower(User.email) == email))
 
-    # Generic message on purpose: do not reveal whether the email exists.
-    if user is None or not verify_password(body.password, user.password_hash):
+    # Always run a verify (dummy hash if no such user) so response time doesn't leak
+    # whether the email exists. Generic message for the same reason.
+    password_ok = verify_password(body.password, user.password_hash if user else DUMMY_HASH)
+    if user is None or not password_ok:
         record_attempt(identity=email, key="login", window_seconds=300)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     if user.status != "active":

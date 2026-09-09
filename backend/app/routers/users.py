@@ -18,6 +18,18 @@ router = APIRouter(prefix="/users", tags=["users"])
 ManageStaff = Annotated[User, Depends(require_permission("canManageStaff"))]
 DbSession = Annotated[Session, Depends(get_db)]
 
+_ADMIN_ROLES = ("SUPER_ADMIN", "DOCTOR_ADMIN")
+_PERM_KEYS = set(DEFAULT_STAFF_PERMISSIONS)
+
+
+def _sanitize_permissions(raw: dict, caller: User) -> dict:
+    """Keep only the known permission keys; a non-admin caller cannot grant a
+    permission they do not themselves hold (blocks self/peer privilege escalation)."""
+    clean = {k: bool(v) for k, v in raw.items() if k in _PERM_KEYS}
+    if caller.role not in _ADMIN_ROLES:
+        clean = {k: (v and bool(caller.permissions.get(k))) for k, v in clean.items()}
+    return clean
+
 
 def _is_last_super_admin(db: Session, target: User) -> bool:
     if target.role != "SUPER_ADMIN":
@@ -52,12 +64,17 @@ def create_user(
     body: UserCreate, request: Request, caller: ManageStaff, db: DbSession
 ) -> User:
     tenant_id = resolve_write_tenant(caller, body.tenant_id)
+
     if body.role == "DOCTOR_ADMIN":
+        if caller.role not in _ADMIN_ROLES:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Only a Doctor Admin or Super Admin can create a Doctor Admin account.",
+            )
         perms = dict(FULL_PERMISSIONS)
-    elif body.permissions is not None:
-        perms = body.permissions.model_dump()
     else:
-        perms = dict(DEFAULT_STAFF_PERMISSIONS)
+        base = body.permissions.model_dump() if body.permissions is not None else dict(DEFAULT_STAFF_PERMISSIONS)
+        perms = _sanitize_permissions(base, caller)
 
     user = User(
         tenant_id=tenant_id,
@@ -118,7 +135,15 @@ def update_user(
             setattr(target, field, data[field])
 
     if data.get("permissions") is not None and target.role != "DOCTOR_ADMIN":
-        target.permissions = {**target.permissions, **data["permissions"]}
+        if caller.role not in _ADMIN_ROLES:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Only a Doctor Admin or Super Admin can change the permission matrix.",
+            )
+        target.permissions = {
+            **target.permissions,
+            **_sanitize_permissions(data["permissions"], caller),
+        }
 
     record_audit(
         db, request, caller, "USER_UPDATED", "User", target.id,

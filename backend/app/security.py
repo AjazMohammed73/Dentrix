@@ -7,6 +7,10 @@ from .config import get_settings
 
 _pwd = PasswordHash.recommended()  # Argon2id
 
+# A real Argon2 hash to verify against when the account doesn't exist, so a wrong
+# email and a wrong password take the same time (no user-enumeration timing oracle).
+DUMMY_HASH = _pwd.hash("not-a-real-password-timing-equalizer")
+
 
 def hash_password(password: str) -> str:
     return _pwd.hash(password)

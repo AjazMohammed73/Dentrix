@@ -218,6 +218,53 @@ booking→invoice→payment→balance chain, and audit coverage. Fixed along the
 **Not covered** (no browser-automation tool here): actual UI click-throughs. tsc + `npm run
 build` pass; the API the UI calls is fully exercised.
 
+## Security hardening (2026-09-10)
+
+Adversarial pass — attempted forgery, IDOR, privilege escalation, injection, DoS,
+info disclosure. 153-assertion suite (`scratchpad/e2e.py`, security section) passes.
+Fixed:
+
+- **Privilege escalation** — a STAFF with `canManageStaff` could `POST /users` a
+  `DOCTOR_ADMIN` (full perms + a password they choose) and log in as a clinic admin.
+  Now: creating a DOCTOR_ADMIN requires the caller *be* a Doctor/Super Admin; a non-admin
+  caller cannot touch the permission matrix at all; and any perms it grants a new STAFF
+  are clamped to the subset the caller itself holds. Unknown permission keys are dropped.
+- **User-enumeration timing oracle** — a wrong email skipped Argon2 (fast) while a valid
+  email + wrong password ran it (slow). Login now always runs a verify (against a dummy
+  hash when there's no such user).
+- **`X-Forwarded-For`-spoofable rate limit** — the login limiter is keyed by the
+  normalised email, not the client IP, so it can't be evaded with a header and doesn't
+  lock out an office behind one NAT.
+- **Integer overflow → 500** — money fields (`amount`, `base_price`, `balance`,
+  `monthlyFee`, payment amount) now have `le=` bounds well below int32.
+- **Payload DoS** — every free-text request field is now length-bounded
+  (clinical-note narrative 20 k, notes/description ~2 k, names/titles/addresses ~120–300,
+  `medical_alerts` ≤30 items × 120 chars, audit `q` ≤200).
+- **LIKE injection** in the audit `?q=` search — `% _ \` are escaped now.
+- **Weak passwords** — minimum bumped 8 → 12 (backend schema + both modals).
+- **`seed_demo` refuses to run when `ENV=production`** (its accounts use `Password123!`).
+- **Prod info disclosure** — `/docs` + `/openapi.json` disabled when `ENV=production`;
+  `GET /` no longer returns the env name.
+- **Response headers** — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy: no-referrer`, `Cache-Control: no-store` on every response.
+- **Frontend** — `window.open(...)` for WhatsApp share now uses `noopener,noreferrer`.
+
+Verified safe (attacked, held): JWT `alg=none` / RS256→HS256 confusion (fixed algorithm
+list); tampered signatures; cross-tenant IDOR on every resource (404, not a leak); SQL
+injection (parameterised throughout); stored XSS (React auto-escapes, no
+`dangerouslySetInnerHTML`); CSRF (Bearer header, not cookies — not applicable);
+`password_hash`/`salt` never in any response; Doctor Admin cannot reach `SUPER_ADMIN`.
+
+### Residual risk (accepted / needs infra)
+- No global brute-force cap across many accounts from one source — needs a WAF /
+  Cloudflare in front (Render's proxy makes an IP-based cap unreliable). Per-account
+  limit + 12-char min + generic errors are the in-app defense.
+- JWT can't be revoked before its 12 h expiry (suspend/delete the user cuts access;
+  role/permission/tenant changes take effect immediately).
+- Token in `sessionStorage` — XSS would expose it, but the XSS surface is minimal
+  (React, no dangerous sinks). `HttpOnly` cookie would trade this for CSRF.
+- `/health` opens a DB connection per hit — a flood could exhaust the pool (recovers).
+
 ## Known limitations (low priority, noted not fixed)
 - No pagination — `GET /patients|appointments|invoices|users` return whole tables
   (`audit-logs` is capped at 200). Fine to ~18 months per clinic; add `?from=/?to=` on

@@ -171,8 +171,8 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({ isOpen, onClose })
               <input
                 type="text"
                 required
-                minLength={8}
-                placeholder="min. 8 characters"
+                minLength={12}
+                placeholder="min. 12 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-surface-50 border border-border rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-primary-600 font-mono"

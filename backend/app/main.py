@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
@@ -16,8 +16,16 @@ from .routers import (
 )
 
 settings = get_settings()
+_is_prod = settings.env == "production"
 
-app = FastAPI(title="Dentrix API", version="0.1.0")
+app = FastAPI(
+    title="Dentrix API",
+    version="0.1.0",
+    # No interactive docs / schema in production.
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None,
+    openapi_url=None if _is_prod else "/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +34,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
 
 for _router in (
     health.router,
@@ -44,4 +63,4 @@ for _router in (
 
 @app.get("/", tags=["root"])
 def root() -> dict:
-    return {"service": "dentrix-api", "env": settings.env}
+    return {"service": "dentrix-api"}

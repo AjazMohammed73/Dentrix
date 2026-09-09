@@ -19,7 +19,7 @@ AuditViewer = Annotated[User, Depends(require_audit_access)]
 def list_audit_logs(
     user: AuditViewer,
     db: DbSession,
-    q: str | None = None,
+    q: str | None = Query(default=None, max_length=200),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ) -> list[AuditLog]:
@@ -27,12 +27,14 @@ def list_audit_logs(
     if user.role != "SUPER_ADMIN":
         stmt = stmt.where(AuditLog.tenant_id == user.tenant_id)
     if q:
-        like = f"%{q.lower()}%"
+        # escape LIKE metacharacters so a query of "%" / "_" can't force a full scan
+        safe = q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{safe}%"
         stmt = stmt.where(
             or_(
-                func.lower(AuditLog.details).like(like),
-                func.lower(AuditLog.user_name).like(like),
-                func.lower(AuditLog.action).like(like),
+                func.lower(AuditLog.details).like(like, escape="\\"),
+                func.lower(AuditLog.user_name).like(like, escape="\\"),
+                func.lower(AuditLog.action).like(like, escape="\\"),
             )
         )
     stmt = stmt.order_by(AuditLog.timestamp.desc()).limit(limit).offset(offset)
