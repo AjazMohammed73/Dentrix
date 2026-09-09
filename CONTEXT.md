@@ -147,6 +147,19 @@ wording; etc. (The role switcher was already removed in part (a).)
 
 ---
 
+## Local run (wired 2026-09-10)
+
+- Neon DB is live (`backend/.env`, gitignored). Migration `2cceb055fef1_initial` applied;
+  one `SUPER_ADMIN` seeded (`suvignan@gmail.com` / `DentrixAdmin!2026` — change it).
+  **The Neon password was pasted in chat — rotate it in the Neon console.**
+- **API runs on `:8001`** locally (`:8000` is taken by the Restaurant-POS backend).
+  `uvicorn app.main:app --host 127.0.0.1 --port 8001` from `backend/`.
+- Frontend `.env` -> `VITE_API_URL=http://127.0.0.1:8001`. `npm run dev` (Vite on
+  `:5180`, in the backend `CORS_ORIGINS`). `:3000` is also allowed but blocked on this box.
+- End-to-end smoke test passed: login -> JWT, all list endpoints 200, audit row written.
+- The app opens empty for the Super Admin — onboard a clinic via "Provision New Clinic",
+  then sign in as that Doctor Admin to exercise patients / appointments / billing.
+
 ## Gotchas / conventions
 
 - FastAPI is pinned to a version where `app.routes` doesn't expand included routers

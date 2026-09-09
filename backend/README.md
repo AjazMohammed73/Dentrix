@@ -57,8 +57,11 @@ On later model changes: `alembic revision --autogenerate -m "..."` then `alembic
 ## Run
 
 ```bash
-uvicorn app.main:app --reload --port 8000       # docs at http://127.0.0.1:8000/docs
+uvicorn app.main:app --reload --port 8001       # docs at http://127.0.0.1:8001/docs
 ```
+
+Local port is **8001** (8000 is used by another project on this machine). The frontend
+`.env` must match (`VITE_API_URL=http://127.0.0.1:8001`).
 
 ### Endpoints
 
