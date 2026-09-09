@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .routers import (
     appointments,
+    audit,
     auth,
     clinical_notes,
     health,
@@ -36,6 +37,7 @@ for _router in (
     appointments.router,
     invoices.router,
     clinical_notes.router,
+    audit.router,
 ):
     app.include_router(_router)
 

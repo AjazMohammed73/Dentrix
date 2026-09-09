@@ -2,11 +2,12 @@ import uuid
 from datetime import date, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..audit import record_audit
 from ..database import get_db
 from ..dependencies import CurrentUser, require_super_admin
 from ..models import FULL_PERMISSIONS, Tenant, User
@@ -42,7 +43,9 @@ def list_tenants(user: CurrentUser, db: DbSession) -> list[Tenant]:
 
 
 @router.post("", response_model=TenantOut, status_code=status.HTTP_201_CREATED)
-def onboard_tenant(body: TenantCreate, _: SuperAdmin, db: DbSession) -> Tenant:
+def onboard_tenant(
+    body: TenantCreate, request: Request, actor: SuperAdmin, db: DbSession
+) -> Tenant:
     fee, chairs = _PLAN_DEFAULTS[body.plan]
     doctor_email = body.doctor_email.strip().lower()
     tenant = Tenant(
@@ -80,6 +83,10 @@ def onboard_tenant(body: TenantCreate, _: SuperAdmin, db: DbSession) -> Tenant:
             status="active",
         )
     )
+    record_audit(
+        db, request, actor, "TENANT_CREATED", "Tenant", tenant.id,
+        f"Onboarded {tenant.name} ({tenant.slug})", tenant_id=tenant.id,
+    )
     try:
         db.commit()
     except IntegrityError:
@@ -93,7 +100,11 @@ def onboard_tenant(body: TenantCreate, _: SuperAdmin, db: DbSession) -> Tenant:
 
 @router.patch("/{tenant_id}", response_model=TenantOut)
 def update_tenant(
-    tenant_id: uuid.UUID, body: TenantUpdate, _: SuperAdmin, db: DbSession
+    tenant_id: uuid.UUID,
+    body: TenantUpdate,
+    request: Request,
+    actor: SuperAdmin,
+    db: DbSession,
 ) -> Tenant:
     tenant = db.get(Tenant, tenant_id)
     if tenant is None:
@@ -105,6 +116,11 @@ def update_tenant(
         tenant.plan = body.subscription.plan
     elif body.plan is not None:
         tenant.plan = body.plan
+    record_audit(
+        db, request, actor, "TENANT_UPDATED", "Tenant", tenant.id,
+        f"Updated {tenant.name} (plan {tenant.plan}, status {tenant.status})",
+        tenant_id=tenant.id,
+    )
     db.commit()
     db.refresh(tenant)
     return tenant
@@ -112,7 +128,11 @@ def update_tenant(
 
 @router.post("/{tenant_id}/assign-doctor-admin", response_model=TenantOut)
 def assign_doctor_admin(
-    tenant_id: uuid.UUID, body: AssignDoctorAdminRequest, _: SuperAdmin, db: DbSession
+    tenant_id: uuid.UUID,
+    body: AssignDoctorAdminRequest,
+    request: Request,
+    actor: SuperAdmin,
+    db: DbSession,
 ) -> Tenant:
     tenant = db.get(Tenant, tenant_id)
     if tenant is None:
@@ -133,6 +153,10 @@ def assign_doctor_admin(
     tenant.doctor_admin_name = target.name
     tenant.doctor_admin_email = target.email
 
+    record_audit(
+        db, request, actor, "DOCTOR_ADMIN_ASSIGNED", "Tenant", tenant.id,
+        f"Assigned {target.name} as Doctor Admin of {tenant.name}", tenant_id=tenant.id,
+    )
     db.commit()
     db.refresh(tenant)
     return tenant

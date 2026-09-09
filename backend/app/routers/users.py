@@ -1,11 +1,12 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..audit import record_audit
 from ..database import get_db
 from ..dependencies import require_permission, resolve_write_tenant
 from ..models import DEFAULT_STAFF_PERMISSIONS, FULL_PERMISSIONS, User
@@ -45,7 +46,9 @@ def list_users(caller: ManageStaff, db: DbSession) -> list[User]:
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def create_user(body: UserCreate, caller: ManageStaff, db: DbSession) -> User:
+def create_user(
+    body: UserCreate, request: Request, caller: ManageStaff, db: DbSession
+) -> User:
     tenant_id = resolve_write_tenant(caller, body.tenant_id)
     if body.role == "DOCTOR_ADMIN":
         perms = dict(FULL_PERMISSIONS)
@@ -66,6 +69,11 @@ def create_user(body: UserCreate, caller: ManageStaff, db: DbSession) -> User:
         status="active",
     )
     db.add(user)
+    db.flush()
+    record_audit(
+        db, request, caller, "USER_CREATED", "User", user.id,
+        f"Invited {user.name} ({user.role})", tenant_id=tenant_id,
+    )
     try:
         db.commit()
     except IntegrityError:
@@ -77,7 +85,11 @@ def create_user(body: UserCreate, caller: ManageStaff, db: DbSession) -> User:
 
 @router.patch("/{user_id}", response_model=UserOut)
 def update_user(
-    user_id: uuid.UUID, body: UserUpdate, caller: ManageStaff, db: DbSession
+    user_id: uuid.UUID,
+    body: UserUpdate,
+    request: Request,
+    caller: ManageStaff,
+    db: DbSession,
 ) -> User:
     target = _get_target(db, caller, user_id)
     data = body.model_dump(exclude_unset=True)
@@ -106,13 +118,20 @@ def update_user(
     if data.get("permissions") is not None and target.role != "DOCTOR_ADMIN":
         target.permissions = {**target.permissions, **data["permissions"]}
 
+    record_audit(
+        db, request, caller, "USER_UPDATED", "User", target.id,
+        f"Updated {target.name} (role {target.role}, status {target.status})",
+        tenant_id=target.tenant_id,
+    )
     db.commit()
     db.refresh(target)
     return target
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: uuid.UUID, caller: ManageStaff, db: DbSession) -> None:
+def delete_user(
+    user_id: uuid.UUID, request: Request, caller: ManageStaff, db: DbSession
+) -> None:
     target = _get_target(db, caller, user_id)
     if target.id == caller.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot delete your own account")
@@ -120,5 +139,9 @@ def delete_user(user_id: uuid.UUID, caller: ManageStaff, db: DbSession) -> None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot delete the last Super Admin")
     if caller.role != "SUPER_ADMIN" and target.role != "STAFF":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only delete staff members")
+    record_audit(
+        db, request, caller, "USER_DELETED", "User", target.id,
+        f"Deleted {target.name}", tenant_id=target.tenant_id,
+    )
     db.delete(target)
     db.commit()

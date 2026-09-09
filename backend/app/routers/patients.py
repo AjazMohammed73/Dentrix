@@ -1,10 +1,11 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..audit import record_audit
 from ..database import get_db
 from ..dependencies import require_permission, scoped
 from ..models import Patient, User
@@ -32,13 +33,20 @@ def list_patients(user: ManagePatients, db: DbSession) -> list[Patient]:
 
 
 @router.post("", response_model=PatientOut, status_code=status.HTTP_201_CREATED)
-def create_patient(body: PatientCreate, user: ManagePatients, db: DbSession) -> Patient:
+def create_patient(
+    body: PatientCreate, request: Request, user: ManagePatients, db: DbSession
+) -> Patient:
     if user.role == "SUPER_ADMIN":
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "Super Admin cannot create patients directly"
         )
     patient = Patient(tenant_id=user.tenant_id, **body.model_dump())
     db.add(patient)
+    db.flush()
+    record_audit(
+        db, request, user, "PATIENT_CREATED", "Patient", patient.id,
+        f"Created patient {patient.first_name} {patient.last_name}",
+    )
     db.commit()
     db.refresh(patient)
     return patient
@@ -46,11 +54,19 @@ def create_patient(body: PatientCreate, user: ManagePatients, db: DbSession) -> 
 
 @router.patch("/{patient_id}", response_model=PatientOut)
 def update_patient(
-    patient_id: uuid.UUID, body: PatientUpdate, user: ManagePatients, db: DbSession
+    patient_id: uuid.UUID,
+    body: PatientUpdate,
+    request: Request,
+    user: ManagePatients,
+    db: DbSession,
 ) -> Patient:
     patient = _get_owned(db, user, patient_id)
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(patient, key, value)
+    record_audit(
+        db, request, user, "PATIENT_UPDATED", "Patient", patient.id,
+        f"Updated patient {patient.first_name} {patient.last_name}",
+    )
     db.commit()
     db.refresh(patient)
     return patient

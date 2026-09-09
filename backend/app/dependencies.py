@@ -54,6 +54,14 @@ def require_super_admin(user: CurrentUser) -> User:
     return user
 
 
+def require_audit_access(user: CurrentUser) -> User:
+    if user.role not in _ADMIN_ROLES:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Audit trail is restricted to administrators"
+        )
+    return user
+
+
 def scoped(stmt: Select, tenant_column, user: User) -> Select:
     """Constrain a SELECT to the caller's tenant. Super Admin sees everything."""
     if user.role != "SUPER_ADMIN":

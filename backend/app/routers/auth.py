@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..audit import record_audit
 from ..database import get_db
 from ..dependencies import CurrentUser
 from ..models import User
@@ -15,7 +16,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Annotated[Session, Depends(get_db)]) -> TokenResponse:
+def login(
+    body: LoginRequest, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> TokenResponse:
     email = body.email.strip().lower()
     user = db.scalar(select(User).where(func.lower(User.email) == email))
 
@@ -27,6 +30,9 @@ def login(body: LoginRequest, db: Annotated[Session, Depends(get_db)]) -> TokenR
             status.HTTP_403_FORBIDDEN,
             "Account is not active. Contact your clinic administrator.",
         )
+
+    record_audit(db, request, user, "SECURITY_LOGIN", "Security", user.id, "Signed in")
+    db.commit()
 
     token = create_access_token(
         user_id=str(user.id),

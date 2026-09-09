@@ -17,11 +17,13 @@ app/
   billing.py          invoice-number allocation, balance recompute, patient-balance sync
   main.py             app factory + CORS + router wiring
   seed.py             one-shot bootstrap Super Admin from env
-  models/             base · tenant · user · patient · service · appointment · invoice · clinical_note
+  audit.py           record_audit() — appends an audit row to the caller's transaction
+  models/             base · tenant · user · patient · service · appointment · invoice
+                      · clinical_note · audit_log
   schemas/            common (CamelModel + Literals) · auth · user · tenant · patient · service
-                      · appointment · invoice · clinical_note
+                      · appointment · invoice · clinical_note · audit
   routers/            health · auth · tenants · users · patients · services · appointments
-                      · invoices · clinical_notes
+                      · invoices · clinical_notes · audit
 alembic/              migrations, wired to app settings in env.py
 ```
 
@@ -77,6 +79,7 @@ uvicorn app.main:app --reload --port 8000       # docs at http://127.0.0.1:8000/
 | POST / PATCH | `/tenants` · `/tenants/{id}` | Super Admin (onboard; status / plan / subscription) |
 | POST | `/tenants/{id}/assign-doctor-admin` | Super Admin — `{userId}` |
 | GET / POST | `/users` · PATCH / DELETE `/users/{id}` | `canManageStaff` |
+| GET | `/audit-logs` (+ `?q=`, `?limit=`, `?offset=`) | Doctor / Super Admin (tenant-scoped) |
 
 Super Admin and Doctor Admin implicitly pass every `require_permission` check. Reads are
 filtered to the caller's tenant; Super Admin sees all. Writes are locked to the caller's
@@ -93,7 +96,10 @@ balance in the same transaction. Clinical notes and payment installments are app
 - Env vars: `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS` (your Vercel domain), `ENV=production`.
   Set `BOOTSTRAP_SUPERADMIN_*` once, run `python -m app.seed` from a shell, then clear the password var.
 - Put the Render service and the Neon project in the **same region**.
+- **Audit immutability**: `audit_logs` is append-only in code. For a hard guarantee,
+  connect the app as a low-privilege role and run once:
+  `REVOKE UPDATE, DELETE ON audit_logs FROM <app_role>;`
 
 ## Next
 
-Per `../CONTEXT.md`: server-side audit log -> wire the frontend contexts to the API.
+Per `../CONTEXT.md`: wire the frontend `AuthContext`/`DataContext` to the API.

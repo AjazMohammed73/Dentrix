@@ -1,11 +1,12 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..audit import record_audit
 from ..database import get_db
 from ..dependencies import require_permission, resolve_write_tenant, scoped
 from ..models import Service, User
@@ -31,12 +32,19 @@ def list_services(user: ManageServices, db: DbSession) -> list[Service]:
 
 
 @router.post("", response_model=ServiceOut, status_code=status.HTTP_201_CREATED)
-def create_service(body: ServiceCreate, user: ManageServices, db: DbSession) -> Service:
+def create_service(
+    body: ServiceCreate, request: Request, user: ManageServices, db: DbSession
+) -> Service:
     tenant_id = resolve_write_tenant(user, body.tenant_id)
     data = body.model_dump(exclude={"tenant_id"})
     data["code"] = data["code"].strip().upper()
     service = Service(tenant_id=tenant_id, **data)
     db.add(service)
+    db.flush()
+    record_audit(
+        db, request, user, "SERVICE_CREATED", "Service", service.id,
+        f"Added procedure {service.code} {service.name}",
+    )
     try:
         db.commit()
     except IntegrityError:
@@ -51,7 +59,11 @@ def create_service(body: ServiceCreate, user: ManageServices, db: DbSession) -> 
 
 @router.patch("/{service_id}", response_model=ServiceOut)
 def update_service(
-    service_id: uuid.UUID, body: ServiceUpdate, user: ManageServices, db: DbSession
+    service_id: uuid.UUID,
+    body: ServiceUpdate,
+    request: Request,
+    user: ManageServices,
+    db: DbSession,
 ) -> Service:
     service = _get_owned(db, user, service_id)
     updates = body.model_dump(exclude_unset=True)
@@ -59,6 +71,10 @@ def update_service(
         updates["code"] = updates["code"].strip().upper()
     for key, value in updates.items():
         setattr(service, key, value)
+    record_audit(
+        db, request, user, "SERVICE_UPDATED", "Service", service.id,
+        f"Updated procedure {service.code} {service.name}",
+    )
     try:
         db.commit()
     except IntegrityError:

@@ -2,10 +2,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..audit import record_audit
 from ..database import get_db
 from ..dependencies import require_permission, scoped
 from ..models import ClinicalNote, Patient, User
@@ -29,7 +30,9 @@ def list_notes(
 
 
 @router.post("", response_model=ClinicalNoteOut, status_code=status.HTTP_201_CREATED)
-def create_note(body: ClinicalNoteCreate, user: WriteNotes, db: DbSession) -> ClinicalNote:
+def create_note(
+    body: ClinicalNoteCreate, request: Request, user: WriteNotes, db: DbSession
+) -> ClinicalNote:
     if user.role == "SUPER_ADMIN":
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "Super Admin cannot write clinical notes"
@@ -56,6 +59,11 @@ def create_note(body: ClinicalNoteCreate, user: WriteNotes, db: DbSession) -> Cl
         signed_at=datetime.now(timezone.utc),
     )
     db.add(note)
+    db.flush()
+    record_audit(
+        db, request, user, "NOTE_SIGNED", "ClinicalNote", note.id,
+        f"Signed clinical note ({note.procedure_name}) for {patient.first_name} {patient.last_name}",
+    )
     db.commit()
     db.refresh(note)
     return note

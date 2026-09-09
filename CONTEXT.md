@@ -88,19 +88,20 @@ Render Postgres ($7) once past a few live clinics.
     Guards: can't touch your own role/status, can't delete yourself, can't demote or
     delete the last Super Admin; Doctor Admin can't manage other admins or delete
     non-staff.
+  - `audit`: `GET /audit-logs` (`?q=`, `?limit=`, `?offset=`) for Doctor/Super Admin,
+    tenant-scoped (Super Admin sees all). `app/audit.py::record_audit()` adds a row to
+    the caller's transaction from every mutation endpoint (login, patient/appt/invoice/
+    note/service/tenant/user changes). Uses the authenticated user + `X-Forwarded-For`,
+    never client-supplied identity. Model `audit_logs` has **no FKs** (survives
+    user/tenant deletion) and no update/delete code paths.
 
 ### Not started — roughly in order
-1. **Server-side audit log** — append-only `audit_logs` table; the app DB role gets no
-   UPDATE/DELETE on it. Write entries from the mutation endpoints (login, patient/appt/
-   invoice/note/service changes). Records the authenticated user + source IP, never
-   client-supplied values. `GET /audit-logs` for Doctor/Super Admin. Add a 90-day
-   retention job (archive older rows to object storage — this table fills Neon).
-2. **Wire the frontend** — replace `context/AuthContext.tsx` and
+1. **Wire the frontend** — replace `context/AuthContext.tsx` and
    `context/DataContext.tsx` `localStorage` logic with `fetch` to the API.
    Add `VITE_API_URL`. Store the JWT (memory + `sessionStorage`), attach as
    `Authorization` header. Keep the same context method names so views don't change.
    Drop the tenant switcher and role switcher (demo-only, like the removed mock data).
-3. **Then** the `PRE_LAUNCH.md` blockers: rate limiting on `/auth/login`, CSV
+2. **Then** the `PRE_LAUNCH.md` blockers: rate limiting on `/auth/login`, CSV
    formula-injection escaping, remove the frontend role switcher + demo accounts,
    drop the unbacked HIPAA/RLS claims, `ErrorBoundary` reset-cache wording, etc.
 
@@ -122,3 +123,7 @@ Render Postgres ($7) once past a few live clinics.
 - **Not building**: `SystemHealth` (DB pool / storage / uptime cards in `SuperAdminView`)
   is decorative fake telemetry — leave it hardcoded on the frontend or drop those cards.
   No `/system-health` endpoint.
+- **Audit append-only** is by construction in code. For real immutability run once on
+  the DB (needs a separate low-priv app role, not the Neon owner):
+  `REVOKE UPDATE, DELETE ON audit_logs FROM <app_role>;`  Also add a 90-day retention
+  job later (archive older rows to object storage — this table is what fills Neon).

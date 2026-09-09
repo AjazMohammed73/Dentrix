@@ -1,11 +1,12 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..audit import record_audit
 from ..billing import apply_patient_balance, build_appointment_invoice
 from ..database import get_db
 from ..dependencies import require_permission, scoped
@@ -112,7 +113,7 @@ def check_conflict(
     )
 
 
-def _create(db: Session, user: User, body: AppointmentCreate) -> Appointment:
+def _create(db: Session, request: Request, user: User, body: AppointmentCreate) -> Appointment:
     tenant_id = user.tenant_id
     patient = db.get(Patient, body.patient_id)
     if patient is None or patient.tenant_id != tenant_id:
@@ -141,7 +142,7 @@ def _create(db: Session, user: User, body: AppointmentCreate) -> Appointment:
             },
         )
 
-    overridden = body.allow_override and (chair_c or doctor_c)
+    overridden = bool(body.allow_override and (chair_c or doctor_c))
     appt = Appointment(
         tenant_id=tenant_id,
         patient_id=patient.id,
@@ -162,9 +163,14 @@ def _create(db: Session, user: User, body: AppointmentCreate) -> Appointment:
         fee=service.base_price,
     )
     db.add(appt)
-    db.flush()  # assign appt.id for the invoice FK
+    db.flush()  # assign appt.id for the invoice FK + audit
     db.add(build_appointment_invoice(db, appt))
     apply_patient_balance(db, patient.id, appt.fee)
+    record_audit(
+        db, request, user, "APPOINTMENT_SCHEDULED", "Appointment", appt.id,
+        f"Booked {appt.service_name} for {appt.patient_name} on {appt.date} {appt.start_time}"
+        + (" (override)" if overridden else ""),
+    )
     db.commit()
     db.refresh(appt)
     return appt
@@ -172,7 +178,7 @@ def _create(db: Session, user: User, body: AppointmentCreate) -> Appointment:
 
 @router.post("", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)
 def create_appointment(
-    body: AppointmentCreate, user: ManageAppointments, db: DbSession
+    body: AppointmentCreate, request: Request, user: ManageAppointments, db: DbSession
 ) -> Appointment:
     if user.role == "SUPER_ADMIN":
         raise HTTPException(
@@ -180,7 +186,7 @@ def create_appointment(
         )
     for _ in range(2):  # retry once if two bookings raced for the same invoice number
         try:
-            return _create(db, user, body)
+            return _create(db, request, user, body)
         except IntegrityError:
             db.rollback()
     raise HTTPException(status.HTTP_409_CONFLICT, "Could not allocate an invoice number; please retry")
@@ -188,11 +194,19 @@ def create_appointment(
 
 @router.patch("/{appointment_id}", response_model=AppointmentOut)
 def update_appointment(
-    appointment_id: uuid.UUID, body: AppointmentUpdate, user: ManageAppointments, db: DbSession
+    appointment_id: uuid.UUID,
+    body: AppointmentUpdate,
+    request: Request,
+    user: ManageAppointments,
+    db: DbSession,
 ) -> Appointment:
     appt = _get_owned(db, user, appointment_id)
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(appt, key, value)
+    record_audit(
+        db, request, user, "APPOINTMENT_STATUS_CHANGED", "Appointment", appt.id,
+        f"{appt.patient_name}: status -> {appt.status}",
+    )
     db.commit()
     db.refresh(appt)
     return appt
@@ -200,8 +214,12 @@ def update_appointment(
 
 @router.delete("/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_appointment(
-    appointment_id: uuid.UUID, user: ManageAppointments, db: DbSession
+    appointment_id: uuid.UUID, request: Request, user: ManageAppointments, db: DbSession
 ) -> None:
     appt = _get_owned(db, user, appointment_id)
+    record_audit(
+        db, request, user, "APPOINTMENT_DELETED", "Appointment", appt.id,
+        f"Cancelled {appt.service_name} for {appt.patient_name} on {appt.date}",
+    )
     db.delete(appt)  # the auto-invoice stays; its appointment_id becomes NULL
     db.commit()
