@@ -10,7 +10,7 @@ import {
   PaymentInstallment,
   SystemHealth,
 } from '../types';
-import { api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
 import { useAuth } from './AuthContext';
 
 // Decorative infra telemetry — there is no `/system-health` endpoint (see CONTEXT.md).
@@ -89,8 +89,11 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 const safeList = async <T,>(path: string): Promise<T[]> => {
   try {
     return await api<T[]>(path);
-  } catch {
-    return [];
+  } catch (e) {
+    // 403 => this role legitimately can't see this list; treat as empty.
+    // Anything else (5xx, network, CORS) is a real failure — surface it.
+    if (e instanceof ApiError && e.status === 403) return [];
+    throw e;
   }
 };
 
@@ -136,15 +139,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([
-      loadPatients(),
-      loadServices(),
-      loadAppointments(),
-      loadNotes(),
-      loadInvoices(),
-      loadAudit(),
-    ]);
-    setLoading(false);
+    try {
+      await Promise.all([
+        loadPatients(),
+        loadServices(),
+        loadAppointments(),
+        loadNotes(),
+        loadInvoices(),
+        loadAudit(),
+      ]);
+    } catch (e) {
+      window.alert(
+        e instanceof Error
+          ? `Couldn't load clinic data: ${e.message}. Check your connection and reload.`
+          : "Couldn't load clinic data. Check your connection and reload.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [loadPatients, loadServices, loadAppointments, loadNotes, loadInvoices, loadAudit]);
 
   useEffect(() => {

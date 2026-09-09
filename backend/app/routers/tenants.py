@@ -70,24 +70,24 @@ def onboard_tenant(
         },
     )
     db.add(tenant)
-    db.flush()
-    db.add(
-        User(
-            tenant_id=tenant.id,
-            name=body.doctor_name.strip(),
-            email=doctor_email,
-            role="DOCTOR_ADMIN",
-            title="Doctor Admin & Clinic Owner",
-            password_hash=hash_password(body.doctor_password),
-            permissions=dict(FULL_PERMISSIONS),
-            status="active",
-        )
-    )
-    record_audit(
-        db, request, actor, "TENANT_CREATED", "Tenant", tenant.id,
-        f"Onboarded {tenant.name} ({tenant.slug})", tenant_id=tenant.id,
-    )
     try:
+        db.flush()
+        db.add(
+            User(
+                tenant_id=tenant.id,
+                name=body.doctor_name.strip(),
+                email=doctor_email,
+                role="DOCTOR_ADMIN",
+                title="Doctor Admin & Clinic Owner",
+                password_hash=hash_password(body.doctor_password),
+                permissions=dict(FULL_PERMISSIONS),
+                status="active",
+            )
+        )
+        record_audit(
+            db, request, actor, "TENANT_CREATED", "Tenant", tenant.id,
+            f"Onboarded {tenant.name} ({tenant.slug})", tenant_id=tenant.id,
+        )
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -144,6 +144,18 @@ def assign_doctor_admin(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "Cannot reassign a Super Admin as a clinic Doctor Admin"
         )
+    if target.tenant_id is not None and target.tenant_id != tenant.id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "That user already belongs to another clinic. Move or invite them first.",
+        )
+
+    # step down any current Doctor Admin(s) of this clinic to Staff
+    for current in db.scalars(
+        select(User).where(User.tenant_id == tenant.id, User.role == "DOCTOR_ADMIN")
+    ):
+        if current.id != target.id:
+            current.role = "STAFF"
 
     target.tenant_id = tenant.id
     target.role = "DOCTOR_ADMIN"

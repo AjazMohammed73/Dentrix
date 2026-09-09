@@ -16,7 +16,7 @@ import {
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { OperatoryChair, AppointmentStatus, Appointment } from '../types';
-import { formatINR } from '../utils/format';
+import { formatINR, todayISO, shiftISO } from '../utils/format';
 
 interface AppointmentsViewProps {
   onBookAppointment: () => void;
@@ -29,7 +29,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
 }) => {
   const { appointments, updateAppointmentStatus, deleteAppointment } = useData();
 
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(todayISO);
   const [selectedChair, setSelectedChair] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'day' | 'chairs' | 'list'>('chairs');
   const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
@@ -59,20 +59,11 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     '17:00',
   ];
 
-  const handlePrevDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
-
-  const handleNextDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
+  const handlePrevDay = () => setSelectedDate((d) => shiftISO(d, -1));
+  const handleNextDay = () => setSelectedDate((d) => shiftISO(d, 1));
 
   const handleToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(todayISO());
   };
 
   const getStatusBadge = (status: AppointmentStatus) => {

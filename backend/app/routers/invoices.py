@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from ..audit import record_audit
@@ -55,21 +56,16 @@ def list_invoices(user: ViewRevenue, db: DbSession) -> list[Invoice]:
         .options(selectinload(Invoice.installments))
         .order_by(Invoice.date.desc())
     )
-    return list(db.scalars(stmt))
+    invoices = list(db.scalars(stmt))
+    # Derive "Overdue" on read — nothing persists it. (Not committed here.)
+    today = date.today()
+    for inv in invoices:
+        if inv.status == "Pending" and inv.balance > 0 and inv.due_date < today:
+            inv.status = "Overdue"
+    return invoices
 
 
-@router.post("", response_model=InvoiceOut, status_code=status.HTTP_201_CREATED)
-def create_invoice(
-    body: InvoiceCreate, request: Request, user: Billing, db: DbSession
-) -> Invoice:
-    if user.role == "SUPER_ADMIN":
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Super Admin cannot create invoices directly"
-        )
-    patient = db.get(Patient, body.patient_id)
-    if patient is None or patient.tenant_id != user.tenant_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Patient not found")
-
+def _make_invoice(db: Session, request: Request, user: User, body: InvoiceCreate, patient: Patient) -> Invoice:
     amount_paid = min(body.amount_paid, body.amount)
     inv = Invoice(
         tenant_id=user.tenant_id,
@@ -95,6 +91,26 @@ def create_invoice(
     db.commit()
     db.refresh(inv)
     return inv
+
+
+@router.post("", response_model=InvoiceOut, status_code=status.HTTP_201_CREATED)
+def create_invoice(
+    body: InvoiceCreate, request: Request, user: Billing, db: DbSession
+) -> Invoice:
+    if user.role == "SUPER_ADMIN":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Super Admin cannot create invoices directly"
+        )
+    patient = db.get(Patient, body.patient_id)
+    if patient is None or patient.tenant_id != user.tenant_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Patient not found")
+
+    for _ in range(3):  # retry on the invoice-number race (concurrent creates same tenant)
+        try:
+            return _make_invoice(db, request, user, body, patient)
+        except IntegrityError:
+            db.rollback()
+    raise HTTPException(status.HTTP_409_CONFLICT, "Could not allocate an invoice number; please retry")
 
 
 @router.post("/{invoice_id}/payments", response_model=InvoiceOut)

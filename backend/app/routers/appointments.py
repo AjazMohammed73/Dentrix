@@ -1,4 +1,5 @@
 import uuid
+from datetime import date as date_type
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -10,7 +11,7 @@ from ..audit import record_audit
 from ..billing import apply_patient_balance, build_appointment_invoice
 from ..database import get_db
 from ..dependencies import require_permission, scoped
-from ..models import Appointment, Patient, Service, User
+from ..models import Appointment, Invoice, Patient, Service, User
 from ..schemas.appointment import (
     AppointmentCreate,
     AppointmentOut,
@@ -81,11 +82,11 @@ def _get_owned(db: Session, user: User, appointment_id: uuid.UUID) -> Appointmen
 def list_appointments(
     user: ManageAppointments,
     db: DbSession,
-    date: str | None = None,
+    date: date_type | None = None,
     patient_id: uuid.UUID | None = None,
 ) -> list[Appointment]:
     stmt = scoped(select(Appointment), Appointment.tenant_id, user)
-    if date:
+    if date is not None:
         stmt = stmt.where(Appointment.date == date)
     if patient_id:
         stmt = stmt.where(Appointment.patient_id == patient_id)
@@ -125,6 +126,10 @@ def _create(db: Session, request: Request, user: User, body: AppointmentCreate) 
     if doctor is None or doctor.tenant_id != tenant_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Provider not found")
 
+    if _to_minutes(body.start_time) + service.duration_minutes >= 24 * 60:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Appointment would run to or past midnight."
+        )
     end_time = _add_minutes(body.start_time, service.duration_minutes)
     chair_c, doctor_c = _find_conflicts(
         db, tenant_id, day=body.date, start=body.start_time, end=end_time,
@@ -135,9 +140,13 @@ def _create(db: Session, request: Request, user: User, body: AppointmentCreate) 
             status.HTTP_409_CONFLICT,
             {
                 "message": "Scheduling conflict",
-                "chairConflict": ConflictPeer.model_validate(chair_c).model_dump(by_alias=True)
+                "chairConflict": ConflictPeer.model_validate(chair_c).model_dump(
+                    by_alias=True, mode="json"
+                )
                 if chair_c else None,
-                "doctorConflict": ConflictPeer.model_validate(doctor_c).model_dump(by_alias=True)
+                "doctorConflict": ConflictPeer.model_validate(doctor_c).model_dump(
+                    by_alias=True, mode="json"
+                )
                 if doctor_c else None,
             },
         )
@@ -201,8 +210,18 @@ def update_appointment(
     db: DbSession,
 ) -> Appointment:
     appt = _get_owned(db, user, appointment_id)
+    was_active = appt.status not in _INACTIVE
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(appt, key, value)
+
+    # Cancelling/no-showing an appointment voids its still-unpaid auto-invoice so the
+    # clinic's A/R and the patient balance don't stay inflated.
+    if was_active and appt.status in _INACTIVE:
+        inv = db.scalar(select(Invoice).where(Invoice.appointment_id == appt.id))
+        if inv is not None and inv.amount_paid == 0 and inv.status != "Paid":
+            apply_patient_balance(db, inv.patient_id, -inv.balance)
+            db.delete(inv)
+
     record_audit(
         db, request, user, "APPOINTMENT_STATUS_CHANGED", "Appointment", appt.id,
         f"{appt.patient_name}: status -> {appt.status}",

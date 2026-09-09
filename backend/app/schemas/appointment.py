@@ -11,7 +11,7 @@ class AppointmentCreate(CamelModel):
     service_id: uuid.UUID
     doctor_id: uuid.UUID
     date: date
-    start_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+    start_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     operatory_chair: OperatoryChair
     notes: str = ""
     allow_override: bool = False  # book anyway despite a scheduling conflict
@@ -50,7 +50,7 @@ class ConflictCheckRequest(CamelModel):
     service_id: uuid.UUID
     doctor_id: uuid.UUID
     date: date
-    start_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+    start_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     operatory_chair: str
     exclude_appointment_id: uuid.UUID | None = None
 

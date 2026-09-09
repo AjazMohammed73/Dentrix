@@ -184,6 +184,50 @@ formula-injection escaping (PRE_LAUNCH); `signedAt`/timestamps render as raw ISO
 - The app opens empty for the Super Admin — onboard a clinic via "Provision New Clinic",
   then sign in as that Doctor Admin to exercise patients / appointments / billing.
 
+## E2E testing & bug fixes (2026-09-10)
+
+Ran a 136-assertion API suite (`scratchpad/e2e.py`) across all 3 roles + a fork-agent
+code review. **136/136 pass.** Covered: every endpoint, auth/RBAC negatives, cross-tenant
+isolation (a clinic-B doctor gets 404 on every clinic-A resource), edge inputs, the
+booking→invoice→payment→balance chain, and audit coverage. Fixed along the way:
+
+- **500→409 on duplicate slug / email / CDT code** — the `db.flush()` added for audit
+  logging fired the unique check *outside* the `try`. Wrapped flush+audit+commit together.
+- **500 on appointment conflict** — the 409 detail dict held a raw `UUID`; now
+  `model_dump(mode="json")`.
+- **500 on `GET /appointments?date=`** — `Date` column compared to a `str`; param is now `date`.
+- **Cancel/No-Show now voids the unpaid auto-invoice** and reverses the patient balance
+  (was leaving A/R permanently inflated).
+- **Suspended tenant now blocks its users** — `get_current_user` checks `tenant.status`.
+- **Missing `Authorization` header → 401** (was 403), so the frontend session-recovery fires.
+- **Login rate limit keyed by email**, not IP — unspoofable via `X-Forwarded-For`, doesn't
+  punish an office behind one NAT; only failed attempts count (10 / 5 min).
+- **`next_invoice_number` uses MAX(...)+1**, not COUNT — a deleted invoice no longer makes
+  the next number collide. `POST /invoices` retries the race like bookings do.
+- **`apply_patient_balance` is now one atomic `UPDATE ... GREATEST(0, balance+delta)`** —
+  no lost-update race between concurrent payments.
+- **"Overdue" is derived on read** in `GET /invoices` (past due-date + unpaid).
+- **`assign-doctor-admin`** rejects a user from another clinic and steps down the old owner(s).
+- **`start_time` regex** tightened to real `HH:MM`; appointment running to/past midnight → 400.
+- **Frontend**: `safeList` rethrows non-403 errors (was hiding 5xx as "no data");
+  `refreshAll` shows one alert on real failure; dates use the browser's local tz, not UTC
+  (`todayISO` / `isoAfterDays` / `shiftISO`); `dentrix:unauthorized` no longer fires on a
+  failed login; `BookAppointmentModal` fills its dropdowns once the lists load;
+  `AuditAction`/`resourceType` TS unions widened to the new server actions.
+
+**Not covered** (no browser-automation tool here): actual UI click-throughs. tsc + `npm run
+build` pass; the API the UI calls is fully exercised.
+
+## Known limitations (low priority, noted not fixed)
+- No pagination — `GET /patients|appointments|invoices|users` return whole tables
+  (`audit-logs` is capped at 200). Fine to ~18 months per clinic; add `?from=/?to=` on
+  appointments first.
+- JWT has no per-token revocation (12 h). Suspend/delete the user to cut access —
+  role/permission/tenant changes already take effect immediately (the row is re-read).
+- Rate limiter + its `_hits` dict are per-process (reset on deploy). One Render instance is fine.
+- Doctor Admin can't self-edit their profile (no UI for it either).
+- `SystemHealth` cards are static placeholders.
+
 ## Gotchas / conventions
 
 - FastAPI is pinned to a version where `app.routes` doesn't expand included routers

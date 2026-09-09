@@ -41,12 +41,12 @@ def create_service(
     data["code"] = data["code"].strip().upper()
     service = Service(tenant_id=tenant_id, **data)
     db.add(service)
-    db.flush()
-    record_audit(
-        db, request, user, "SERVICE_CREATED", "Service", service.id,
-        f"Added procedure {service.code} {service.name}",
-    )
     try:
+        db.flush()
+        record_audit(
+            db, request, user, "SERVICE_CREATED", "Service", service.id,
+            f"Added procedure {service.code} {service.name}",
+        )
         db.commit()
     except IntegrityError:
         db.rollback()

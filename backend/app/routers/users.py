@@ -71,12 +71,12 @@ def create_user(
         status="active",
     )
     db.add(user)
-    db.flush()
-    record_audit(
-        db, request, caller, "USER_CREATED", "User", user.id,
-        f"Invited {user.name} ({user.role})", tenant_id=tenant_id,
-    )
     try:
+        db.flush()
+        record_audit(
+            db, request, caller, "USER_CREATED", "User", user.id,
+            f"Invited {user.name} ({user.role})", tenant_id=tenant_id,
+        )
         db.commit()
     except IntegrityError:
         db.rollback()

@@ -3,7 +3,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from .models import Appointment, Invoice, Patient
@@ -12,16 +12,22 @@ from .models import Appointment, Invoice, Patient
 def next_invoice_number(db: Session, tenant_id: uuid.UUID) -> str:
     """INV-<year>-<00001..>, per tenant.
 
-    ponytail: count-based; the appointments router retries once on the unique-constraint
-    collision. Move to a per-tenant Postgres sequence only if bookings go truly concurrent.
+    Uses MAX(number)+1, not COUNT — a deleted invoice must not make the next number
+    collide with a still-present higher one. The appointments router also retries once
+    on the unique-constraint race. Move to a per-tenant Postgres sequence only if
+    bookings ever go truly concurrent at volume.
     """
     prefix = f"INV-{date.today().year}-"
-    used = db.scalar(
-        select(func.count())
-        .select_from(Invoice)
-        .where(Invoice.tenant_id == tenant_id, Invoice.invoice_number.like(f"{prefix}%"))
+    last = db.scalar(
+        select(func.max(Invoice.invoice_number)).where(
+            Invoice.tenant_id == tenant_id, Invoice.invoice_number.like(f"{prefix}%")
+        )
     )
-    return f"{prefix}{(used or 0) + 1:05d}"
+    try:
+        nxt = int(last.rsplit("-", 1)[1]) + 1 if last else 1
+    except (ValueError, IndexError):
+        nxt = 1
+    return f"{prefix}{nxt:05d}"
 
 
 def recompute_invoice(inv: Invoice) -> None:
@@ -34,10 +40,15 @@ def recompute_invoice(inv: Invoice) -> None:
 
 
 def apply_patient_balance(db: Session, patient_id: uuid.UUID, delta: int) -> None:
-    """ponytail: maintained denormal; could be SUM(invoice.balance) computed on read."""
-    patient = db.get(Patient, patient_id)
-    if patient is not None:
-        patient.balance = max(0, patient.balance + delta)
+    """Atomic in-DB increment so two concurrent payments can't lose an update.
+
+    ponytail: still a maintained denormal; could be SUM(invoice.balance) on read.
+    """
+    db.execute(
+        update(Patient)
+        .where(Patient.id == patient_id)
+        .values(balance=func.greatest(0, Patient.balance + delta))
+    )
 
 
 def build_appointment_invoice(db: Session, appt: Appointment) -> Invoice:

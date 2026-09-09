@@ -19,7 +19,7 @@ import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { InvoiceStatus, Invoice, PaymentInstallment } from '../types';
-import { formatINR } from '../utils/format';
+import { formatINR, todayISO } from '../utils/format';
 import { toCsv, downloadCsv } from '../utils/csv';
 import { AccessDeniedView } from './AccessDeniedView';
 import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
@@ -59,7 +59,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Daily calculations
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayISO();
   const todaysAppointments = appointments.filter((a) => a.date === todayStr);
   const totalBilledToday = todaysAppointments.reduce((sum, a) => sum + a.fee, 0);
 

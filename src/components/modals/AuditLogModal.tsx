@@ -12,7 +12,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { AuditAction, AuditLogEntry } from '../../types';
+import { AuditLogEntry } from '../../types';
 import { toCsv, downloadCsv } from '../../utils/csv';
 import { formatDateTime } from '../../utils/format';
 
@@ -49,7 +49,7 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose })
     return true;
   });
 
-  const getActionBadgeColor = (action: AuditAction) => {
+  const getActionBadgeColor = (action: string) => {
     if (action.includes('SECURITY') || action.includes('PASSWORD')) {
       return 'bg-purple-100 text-purple-800 border-purple-200';
     }

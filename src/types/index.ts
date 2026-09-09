@@ -227,20 +227,34 @@ export type AuditAction =
   | 'PAYMENT_RECORDED'
   | 'INVOICE_DELETED'
   | 'SERVICE_CREATED'
-  | 'SERVICE_UPDATED';
+  | 'SERVICE_UPDATED'
+  | 'TENANT_CREATED'
+  | 'TENANT_UPDATED'
+  | 'DOCTOR_ADMIN_ASSIGNED'
+  | 'USER_CREATED'
+  | 'USER_UPDATED'
+  | 'USER_DELETED';
 
 export interface AuditLogEntry {
   id: string;
-  tenantId: string;
+  tenantId: string | null;
   timestamp: string;
-  userId: string;
+  userId: string | null;
   userName: string;
-  userRole: UserRole;
-  action: AuditAction;
-  resourceType: 'Patient' | 'Appointment' | 'ClinicalNote' | 'Invoice' | 'Security' | 'Service';
-  resourceId?: string;
+  userRole: UserRole | '';
+  action: AuditAction | string;
+  resourceType:
+    | 'Patient'
+    | 'Appointment'
+    | 'ClinicalNote'
+    | 'Invoice'
+    | 'Security'
+    | 'Service'
+    | 'Tenant'
+    | 'User';
+  resourceId?: string | null;
   details: string;
-  ipAddress?: string;
+  ipAddress?: string | null;
 }
 
 export interface SystemHealth {

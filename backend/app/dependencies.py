@@ -9,17 +9,21 @@ from sqlalchemy import Select
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import User
+from .models import Tenant, User
 from .security import decode_access_token
 
-_bearer = HTTPBearer(auto_error=True)
+# auto_error=False so a *missing* header is a 401 (not Starlette's default 403) —
+# the frontend only triggers session recovery on 401.
+_bearer = HTTPBearer(auto_error=False)
 _ADMIN_ROLES = {"SUPER_ADMIN", "DOCTOR_ADMIN"}
 
 
 def get_current_user(
-    creds: Annotated[HTTPAuthorizationCredentials, Depends(_bearer)],
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     db: Annotated[Session, Depends(get_db)],
 ) -> User:
+    if creds is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
     try:
         payload = decode_access_token(creds.credentials)
         user_id = uuid.UUID(payload["sub"])
@@ -29,6 +33,13 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None or user.status != "active":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account not active")
+    if user.tenant_id is not None:
+        tenant = db.get(Tenant, user.tenant_id)
+        if tenant is None or tenant.status != "active":
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "This clinic's account is suspended. Contact the platform administrator.",
+            )
     return user
 
 

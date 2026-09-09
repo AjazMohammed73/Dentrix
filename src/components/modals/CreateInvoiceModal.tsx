@@ -3,7 +3,7 @@ import { X, FileText, User, DollarSign, Calendar, CreditCard, Sparkles } from 'l
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { InvoiceStatus, Invoice } from '../../types';
-import { formatINR } from '../../utils/format';
+import { formatINR, todayISO, isoAfterDays } from '../../utils/format';
 
 interface CreateInvoiceModalProps {
   isOpen: boolean;
@@ -25,12 +25,8 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const [serviceName, setServiceName] = useState(services[0]?.name || 'Routine Dental Care & Consultation');
   const [amount, setAmount] = useState<number>(services[0]?.basePrice || 2500);
   const [amountPaid, setAmountPaid] = useState<number>(0);
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [dueDate, setDueDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 15);
-    return d.toISOString().split('T')[0];
-  });
+  const [date, setDate] = useState(todayISO);
+  const [dueDate, setDueDate] = useState(() => isoAfterDays(15));
   const [status, setStatus] = useState<InvoiceStatus>('Pending');
   const [paymentMethod, setPaymentMethod] = useState<Invoice['paymentMethod']>('Cash');
 

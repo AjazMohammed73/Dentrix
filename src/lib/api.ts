@@ -58,7 +58,9 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
 
-  if (res.status === 401) {
+  // A 401 from an authed request means the session died — recover. A 401 from the
+  // login call itself is just a wrong password; leave any existing session alone.
+  if (res.status === 401 && !path.startsWith('/auth/login')) {
     setToken(null);
     window.dispatchEvent(new Event('dentrix:unauthorized'));
   }
