@@ -25,6 +25,7 @@ def create_access_token(*, user_id: str, role: str, tenant_id: str | None) -> st
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
+        "typ": "access",
         "role": role,
         "tenant_id": str(tenant_id) if tenant_id else None,
         "iat": now,
@@ -33,7 +34,19 @@ def create_access_token(*, user_id: str, role: str, tenant_id: str | None) -> st
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def decode_access_token(token: str) -> dict:
+def create_refresh_token(*, user_id: str) -> str:
+    settings = get_settings()
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "typ": "refresh",
+        "iat": now,
+        "exp": now + timedelta(days=settings.refresh_token_expire_days),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_token(token: str) -> dict:
     settings = get_settings()
     return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
 
@@ -50,6 +63,9 @@ if __name__ == "__main__":
     assert not verify_password("wrong-pw", h)
 
     tok = create_access_token(user_id="u1", role="STAFF", tenant_id=None)
-    data = decode_access_token(tok)
-    assert data["sub"] == "u1" and data["role"] == "STAFF" and data["tenant_id"] is None
+    data = decode_token(tok)
+    assert data["sub"] == "u1" and data["role"] == "STAFF" and data["typ"] == "access"
+
+    rt = create_refresh_token(user_id="u1")
+    assert decode_token(rt)["typ"] == "refresh"
     print("security self-check ok")

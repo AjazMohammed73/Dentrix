@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..audit import record_audit
 from ..database import get_db
-from ..dependencies import require_permission, scoped
+from ..dependencies import Pagination, require_permission, scoped
 from ..models import ClinicalNote, Patient, User
 from ..schemas.clinical_note import ClinicalNoteCreate, ClinicalNoteOut
 
@@ -21,12 +21,16 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 @router.get("", response_model=list[ClinicalNoteOut])
 def list_notes(
-    user: ReadNotes, db: DbSession, patient_id: uuid.UUID | None = None
+    user: ReadNotes,
+    db: DbSession,
+    page: Pagination,
+    patient_id: uuid.UUID | None = None,
 ) -> list[ClinicalNote]:
     stmt = scoped(select(ClinicalNote), ClinicalNote.tenant_id, user)
     if patient_id:
         stmt = stmt.where(ClinicalNote.patient_id == patient_id)
-    return list(db.scalars(stmt.order_by(ClinicalNote.signed_at.desc())))
+    stmt = stmt.order_by(ClinicalNote.signed_at.desc()).limit(page.limit).offset(page.offset)
+    return list(db.scalars(stmt))
 
 
 @router.post("", response_model=ClinicalNoteOut, status_code=status.HTTP_201_CREATED)

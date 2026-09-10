@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 720
+    refresh_token_expire_days: int = 30
     cors_origins: str = ""
     env: str = "development"
 

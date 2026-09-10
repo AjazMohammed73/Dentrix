@@ -1,16 +1,17 @@
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import Select
 from sqlalchemy.orm import Session
 
 from .database import get_db
 from .models import Tenant, User
-from .security import decode_access_token
+from .security import decode_token
 
 # auto_error=False so a *missing* header is a 401 (not Starlette's default 403) —
 # the frontend only triggers session recovery on 401.
@@ -25,7 +26,9 @@ def get_current_user(
     if creds is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
     try:
-        payload = decode_access_token(creds.credentials)
+        payload = decode_token(creds.credentials)
+        if payload.get("typ") != "access":
+            raise ValueError("not an access token")
         user_id = uuid.UUID(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
@@ -89,6 +92,22 @@ def scoped(stmt: Select, tenant_column, user: User) -> Select:
     if user.role != "SUPER_ADMIN":
         return stmt.where(tenant_column == user.tenant_id)
     return stmt
+
+
+@dataclass
+class Page:
+    limit: int
+    offset: int
+
+
+def paginate(
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page:
+    return Page(limit=limit, offset=offset)
+
+
+Pagination = Annotated[Page, Depends(paginate)]
 
 
 def resolve_write_tenant(user: User, body_tenant_id: uuid.UUID | None) -> uuid.UUID:

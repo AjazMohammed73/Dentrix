@@ -270,16 +270,35 @@ injection (parameterised throughout); stored XSS (React auto-escapes, no
 - Backend: 1 MB request-body cap (413); `/health` no longer opens a DB connection
   (`/health/ready` does, for monitoring) so a flood can't drain the pool.
 
+### Pagination + token storage (2026-09-10)
+- **Pagination** — every list endpoint (`/patients`, `/appointments`, `/invoices`,
+  `/users`, `/clinical-notes`) takes `?limit=` (default 200, **max 1000**) + `?offset=`;
+  `/appointments` also takes `?from=`/`?to=` date range. The frontend `DataContext`
+  requests `limit=1000` and an 8-month appointment window, and still filters/searches
+  client-side. Server-side `?q` search + a paged UI is the follow-up past ~1000
+  patients/clinic; `/audit-logs` was already capped.
+- **Token storage** — the access token is now **in memory only** (no
+  localStorage/sessionStorage). On login the server sets an **HttpOnly** `dentrix_refresh`
+  cookie (30 d, `Path=/auth`, `SameSite=None; Secure` in prod / `Lax` locally) plus a
+  JS-readable `dentrix_csrf` cookie. `POST /auth/refresh` mints a fresh access token from
+  the refresh cookie (rotating both) — guarded by a **double-submit CSRF check**
+  (`X-CSRF-Token` header must equal the `dentrix_csrf` cookie). `POST /auth/logout` clears
+  them. On mount / on any 401, the SPA silently calls `/auth/refresh` once. Net: an XSS
+  can't steal a long-lived credential, and there's no persisted token to lift.
+- **Body cap** — pure-ASGI middleware: 1 MB, honours `Content-Length` and caps the actual
+  chunked stream, drains the rest so the client gets a clean 413.
+
 ### Remaining attack surface (beyond Vercel/Render config)
 Ranked; none are open holes, they're the next hardening tier.
 
 1. **No global brute-force / credential-stuffing cap** across many accounts from one
    source. In-app defense = per-email limit + 12-char min + generic errors + timing
    equalized. Real fix: Cloudflare / a WAF in front of Vercel+Render.
-2. **JWT not revocable for its 12 h life.** A stolen token works until `exp`.
-   Kill switch today = suspend/delete the user (takes effect next request). Better:
-   a `token_version` int on `users`, embedded in the JWT and checked on load; bump it
-   on password change / "log out everywhere". Also consider a 1 h access token + refresh.
+2. **Access token not revocable for its 12 h life.** The *persisted* credential is now
+   an HttpOnly refresh cookie (XSS-safe), but a leaked in-memory access token still works
+   until `exp`. Kill switch = suspend/delete the user (next request). Better: a
+   `token_version` int on `users` in both tokens, checked on load, bumped on password
+   change / "log out everywhere"; and drop the access token to ~15 min (refresh covers UX).
 3. **No MFA.** For healthcare-adjacent data, TOTP on `SUPER_ADMIN` / `DOCTOR_ADMIN`
    accounts is a genuine gap.
 4. **No password-reset flow.** Admins hand out temp passwords out-of-band (Slack/email)
@@ -298,9 +317,6 @@ Ranked; none are open holes, they're the next hardening tier.
 10. **Rotate the Neon password** — it was pasted in chat.
 11. Third-party Google Fonts (CSP restricts the origins, low risk) — optionally
     self-host the woff2 files to drop the dependency + the privacy leak.
-12. **Chunked-body DoS** — the 1 MB cap is by `Content-Length`; a chunked request with
-    no length header isn't caught. Rely on Render/Cloudflare body limits, or read the
-    stream with a hard cap.
 
 ### Residual risk (accepted / needs infra)
 - No global brute-force cap across many accounts from one source — needs a WAF /

@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, LogOut } from 'lucide-react';
+import { api } from '../../lib/api';
 
 interface Props {
   children: ReactNode;
@@ -37,12 +38,9 @@ export class ErrorBoundary extends Component<Props, State> {
         'Sign out and reload the app? Your clinic data is stored on the server and is not affected.',
       )
     ) {
-      try {
-        sessionStorage.removeItem('dentrix_token');
-      } catch {
-        /* storage unavailable */
-      }
-      window.location.reload();
+      api('/auth/logout', { method: 'POST' })
+        .catch(() => undefined)
+        .finally(() => window.location.reload());
     }
   };
 

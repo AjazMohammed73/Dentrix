@@ -2,7 +2,7 @@ import uuid
 from datetime import date as date_type
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..audit import record_audit
 from ..billing import apply_patient_balance, build_appointment_invoice
 from ..database import get_db
-from ..dependencies import require_permission, scoped
+from ..dependencies import Pagination, require_permission, scoped
 from ..models import Appointment, Invoice, Patient, Service, User
 from ..schemas.appointment import (
     AppointmentCreate,
@@ -82,15 +82,23 @@ def _get_owned(db: Session, user: User, appointment_id: uuid.UUID) -> Appointmen
 def list_appointments(
     user: ManageAppointments,
     db: DbSession,
+    page: Pagination,
     date: date_type | None = None,
     patient_id: uuid.UUID | None = None,
+    date_from: Annotated[date_type | None, Query(alias="from")] = None,
+    date_to: Annotated[date_type | None, Query(alias="to")] = None,
 ) -> list[Appointment]:
     stmt = scoped(select(Appointment), Appointment.tenant_id, user)
     if date is not None:
         stmt = stmt.where(Appointment.date == date)
+    if date_from is not None:
+        stmt = stmt.where(Appointment.date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(Appointment.date <= date_to)
     if patient_id:
         stmt = stmt.where(Appointment.patient_id == patient_id)
-    return list(db.scalars(stmt.order_by(Appointment.date, Appointment.start_time)))
+    stmt = stmt.order_by(Appointment.date, Appointment.start_time).limit(page.limit).offset(page.offset)
+    return list(db.scalars(stmt))
 
 
 @router.post("/check-conflict", response_model=ConflictCheckResponse)
