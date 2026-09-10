@@ -13,7 +13,12 @@ from ..database import get_db
 from ..dependencies import Pagination, require_billing_access, require_permission, scoped
 from ..models import Invoice, Patient, PaymentInstallment, User
 from ..schemas.common import InstallmentMethod
-from ..schemas.invoice import InvoiceCreate, InvoiceOut, InvoicePaymentRequest
+from ..schemas.invoice import (
+    InvoiceCreate,
+    InvoiceOut,
+    InvoicePaymentRequest,
+    InvoiceUpdate,
+)
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
@@ -157,6 +162,27 @@ def mark_paid(
         )
         db.commit()
         db.refresh(inv)
+    return inv
+
+
+@router.patch("/{invoice_id}", response_model=InvoiceOut)
+def update_invoice(
+    invoice_id: uuid.UUID,
+    body: InvoiceUpdate,
+    request: Request,
+    user: ViewRevenue,
+    db: DbSession,
+) -> Invoice:
+    inv = _get_owned(db, user, invoice_id)
+    data = body.model_dump(exclude_unset=True)
+    if "insurance_claim" in data:
+        inv.insurance_claim = data["insurance_claim"]
+    record_audit(
+        db, request, user, "INVOICE_UPDATED", "Invoice", inv.id,
+        f"Updated insurance claim on {inv.invoice_number}",
+    )
+    db.commit()
+    db.refresh(inv)
     return inv
 
 

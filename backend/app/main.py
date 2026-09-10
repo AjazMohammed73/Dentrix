@@ -13,15 +13,22 @@ from .routers import (
     clinical_notes,
     health,
     invoices,
+    operatory_chairs,
     patients,
+    perio_charts,
+    prescriptions,
+    radiographs,
     services,
     tenants,
+    treatment_plans,
     users,
 )
 
 settings = get_settings()
 _is_prod = settings.env == "production"
 _MAX_BODY_BYTES = 1_000_000  # 1 MB — generous for JSON
+# Radiograph uploads carry a base64 image (frontend caps the file at 5 MB ≈ 6.7 MB b64).
+_BODY_OVERRIDES: dict[str, int] = {"/radiographs": 8_000_000}
 
 
 class _BodyTooLarge(Exception):
@@ -30,16 +37,20 @@ class _BodyTooLarge(Exception):
 
 class BodySizeLimitMiddleware:
     """Pure-ASGI request-body cap. Honours Content-Length up front, and also caps the
-    actual byte stream for chunked requests that omit it."""
+    actual byte stream for chunked requests that omit it. A few paths carrying binary
+    payloads get a larger cap via `overrides`."""
 
-    def __init__(self, app, max_bytes: int) -> None:
+    def __init__(self, app, max_bytes: int, overrides: dict[str, int] | None = None) -> None:
         self.app = app
         self.max_bytes = max_bytes
+        self.overrides = overrides or {}
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+
+        max_bytes = self.overrides.get(scope.get("path", ""), self.max_bytes)
 
         async def drain() -> None:
             # discard the rest of the body so the client gets a clean 413, not a reset
@@ -55,7 +66,7 @@ class BodySizeLimitMiddleware:
             )
 
         for name, value in scope.get("headers", []):
-            if name == b"content-length" and value.isdigit() and int(value) > self.max_bytes:
+            if name == b"content-length" and value.isdigit() and int(value) > max_bytes:
                 await reject()
                 return
 
@@ -66,7 +77,7 @@ class BodySizeLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 total += len(message.get("body", b""))
-                if total > self.max_bytes:
+                if total > max_bytes:
                     raise _BodyTooLarge
             return message
 
@@ -84,7 +95,7 @@ app = FastAPI(
     openapi_url=None if _is_prod else "/openapi.json",
 )
 
-app.add_middleware(BodySizeLimitMiddleware, max_bytes=_MAX_BODY_BYTES)
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=_MAX_BODY_BYTES, overrides=_BODY_OVERRIDES)
 
 app.add_middleware(
     CORSMiddleware,
@@ -147,6 +158,11 @@ for _router in (
     appointments.router,
     invoices.router,
     clinical_notes.router,
+    prescriptions.router,
+    radiographs.router,
+    perio_charts.router,
+    treatment_plans.router,
+    operatory_chairs.router,
     audit.router,
 ):
     app.include_router(_router)

@@ -18,17 +18,16 @@ import {
   OperatoryChairType,
   SystemHealth,
 } from '../types';
-import {
-  initialPrescriptions,
-  initialRadiographs,
-  initialPerioCharts,
-  initialTreatmentPlans,
-  initialOperatoryChairs,
-} from '../data/mockData';
 import { ApiError, api } from '../lib/api';
 import { isoAfterDays } from '../utils/format';
 import { useAuth } from './AuthContext';
-import { safeStorageSet } from '../utils/storage';
+
+// Standard chairs handed to a clinic that hasn't customised its operatories yet.
+const DEFAULT_OPERATORY_CHAIRS: Omit<OperatoryChairConfig, 'tenantId'>[] = [
+  { id: 'chair_default_1', name: 'Chair 1 - Hygiene', chairType: 'Hygiene', isActive: true, color: 'sky' },
+  { id: 'chair_default_2', name: 'Chair 2 - Surgery', chairType: 'Surgery', isActive: true, color: 'rose' },
+  { id: 'chair_default_3', name: 'Chair 3 - General', chairType: 'General', isActive: true, color: 'emerald' },
+];
 
 // Decorative infra telemetry — there is no `/system-health` endpoint (see CONTEXT.md).
 const STATIC_SYSTEM_HEALTH: SystemHealth = {
@@ -121,28 +120,34 @@ interface DataContextType {
   };
 
   // Clinical Suite Actions
-  addPrescription: (data: Omit<DentalPrescription, 'id' | 'createdAt' | 'tenantId'>) => DentalPrescription;
-  deletePrescription: (id: string) => void;
-  addRadiograph: (data: Omit<DentalRadiograph, 'id' | 'tenantId'>) => DentalRadiograph;
-  deleteRadiograph: (id: string) => void;
-  savePerioChart: (chart: Omit<PeriodontalChart, 'id' | 'tenantId'> & { id?: string }) => PeriodontalChart;
-  addTreatmentPlan: (data: Omit<PatientTreatmentPlan, 'id' | 'tenantId'>) => PatientTreatmentPlan;
+  addPrescription: (
+    data: Omit<DentalPrescription, 'id' | 'createdAt' | 'tenantId'>,
+  ) => Promise<DentalPrescription>;
+  deletePrescription: (id: string) => Promise<void>;
+  addRadiograph: (data: Omit<DentalRadiograph, 'id' | 'tenantId'>) => Promise<DentalRadiograph>;
+  deleteRadiograph: (id: string) => Promise<void>;
+  savePerioChart: (
+    chart: Omit<PeriodontalChart, 'id' | 'tenantId'> & { id?: string },
+  ) => Promise<PeriodontalChart>;
+  addTreatmentPlan: (
+    data: Omit<PatientTreatmentPlan, 'id' | 'tenantId'>,
+  ) => Promise<PatientTreatmentPlan>;
   updateTreatmentPlanItemStatus: (
     planId: string,
     phaseId: string,
     itemId: string,
     status: TreatmentPlanItem['status'],
-  ) => void;
-  acceptTreatmentPlan: (planId: string) => void;
+  ) => Promise<void>;
+  acceptTreatmentPlan: (planId: string) => Promise<void>;
 
   // Operatory Chair & Waiting Room Actions
   addOperatoryChair: (
     name: string,
     chairType: OperatoryChairType,
     roomNumber?: string,
-  ) => { success: boolean; message?: string; chair?: OperatoryChairConfig };
-  updateOperatoryChair: (id: string, updates: Partial<OperatoryChairConfig>) => void;
-  deleteOperatoryChair: (id: string) => { success: boolean; message?: string };
+  ) => Promise<{ success: boolean; message?: string; chair?: OperatoryChairConfig }>;
+  updateOperatoryChair: (id: string, updates: Partial<OperatoryChairConfig>) => Promise<void>;
+  deleteOperatoryChair: (id: string) => Promise<{ success: boolean; message?: string }>;
   markPatientArrived: (appointmentId: string) => void;
   assignChairAndSeat: (appointmentId: string, operatoryChair: string) => void;
 
@@ -150,7 +155,7 @@ interface DataContextType {
   updateInvoiceInsuranceClaim: (
     invoiceId: string,
     claimData: Partial<NonNullable<Invoice['insuranceClaim']>>,
-  ) => void;
+  ) => Promise<void>;
   restoreBackupData: (backupData: any) => { success: boolean; message?: string };
   logAuditEvent: (
     action: AuditAction,
@@ -203,73 +208,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Local/persisted states for clinical suite & chair config
-  const [allPrescriptions, setAllPrescriptions] = useState<DentalPrescription[]>(() => {
-    const saved = localStorage.getItem('dentrix_prescriptions');
-    return saved ? JSON.parse(saved) : initialPrescriptions;
-  });
+  // Clinical suite & chair config — API-backed, tenant-scoped server-side.
+  const [prescriptions, setPrescriptions] = useState<DentalPrescription[]>([]);
+  const [radiographs, setRadiographs] = useState<DentalRadiograph[]>([]);
+  const [perioCharts, setPerioCharts] = useState<PeriodontalChart[]>([]);
+  const [treatmentPlans, setTreatmentPlans] = useState<PatientTreatmentPlan[]>([]);
+  const [serverChairs, setServerChairs] = useState<OperatoryChairConfig[]>([]);
 
-  const [allRadiographs, setAllRadiographs] = useState<DentalRadiograph[]>(() => {
-    const saved = localStorage.getItem('dentrix_radiographs');
-    return saved ? JSON.parse(saved) : initialRadiographs;
-  });
-
-  const [allPerioCharts, setAllPerioCharts] = useState<PeriodontalChart[]>(() => {
-    const saved = localStorage.getItem('dentrix_perio_charts');
-    return saved ? JSON.parse(saved) : initialPerioCharts;
-  });
-
-  const [allTreatmentPlans, setAllTreatmentPlans] = useState<PatientTreatmentPlan[]>(() => {
-    const saved = localStorage.getItem('dentrix_treatment_plans');
-    return saved ? JSON.parse(saved) : initialTreatmentPlans;
-  });
-
-  const [allOperatoryChairs, setAllOperatoryChairs] = useState<OperatoryChairConfig[]>(() => {
-    const saved = localStorage.getItem('dentrix_operatory_chairs');
-    return saved ? JSON.parse(saved) : initialOperatoryChairs;
-  });
-
-  // Sync to local storage
-  useEffect(() => {
-    safeStorageSet('dentrix_prescriptions', allPrescriptions, 'prescriptions');
-  }, [allPrescriptions]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_radiographs', allRadiographs, 'radiographs');
-  }, [allRadiographs]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_perio_charts', allPerioCharts, 'perio_charts');
-  }, [allPerioCharts]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_treatment_plans', allTreatmentPlans, 'treatment_plans');
-  }, [allTreatmentPlans]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_operatory_chairs', allOperatoryChairs, 'operatory_chairs');
-  }, [allOperatoryChairs]);
-
-  // Scoped views
-  const prescriptions = isSuperAdmin
-    ? allPrescriptions
-    : allPrescriptions.filter((p) => p.tenantId === currentTenantId);
-
-  const radiographs = isSuperAdmin
-    ? allRadiographs
-    : allRadiographs.filter((r) => r.tenantId === currentTenantId);
-
-  const perioCharts = isSuperAdmin
-    ? allPerioCharts
-    : allPerioCharts.filter((pc) => pc.tenantId === currentTenantId);
-
-  const treatmentPlans = isSuperAdmin
-    ? allTreatmentPlans
-    : allTreatmentPlans.filter((tp) => tp.tenantId === currentTenantId);
-
-  const operatoryChairs = isSuperAdmin
-    ? allOperatoryChairs
-    : allOperatoryChairs.filter((oc) => oc.tenantId === currentTenantId);
+  // A brand-new clinic has no chairs configured yet; hand it a standard set (bound to
+  // the live tenant) so the booking dropdown isn't empty until it customises them
+  // via ManageChairs, which persists real rows and makes this fallback stop firing.
+  const operatoryChairs =
+    serverChairs.length > 0
+      ? serverChairs
+      : DEFAULT_OPERATORY_CHAIRS.map((c) => ({ ...c, tenantId: currentTenantId }));
 
   // Loaders
   const loadPatients = useCallback(() => safeList<Patient>('/patients').then(setPatients), []);
@@ -295,6 +247,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     () => (canAudit ? safeList<AuditLogEntry>('/audit-logs') : Promise.resolve([])).then(setAuditLogs),
     [canAudit],
   );
+  const loadPrescriptions = useCallback(
+    () => safeList<DentalPrescription>('/prescriptions').then(setPrescriptions),
+    [],
+  );
+  const loadRadiographs = useCallback(
+    () => safeList<DentalRadiograph>('/radiographs').then(setRadiographs),
+    [],
+  );
+  const loadPerioCharts = useCallback(
+    () => safeList<PeriodontalChart>('/perio-charts').then(setPerioCharts),
+    [],
+  );
+  const loadTreatmentPlans = useCallback(
+    () => safeList<PatientTreatmentPlan>('/treatment-plans').then(setTreatmentPlans),
+    [],
+  );
+  const loadChairs = useCallback(
+    () => safeList<OperatoryChairConfig>('/operatory-chairs').then(setServerChairs),
+    [],
+  );
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
@@ -306,6 +278,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loadNotes(),
         loadInvoices(),
         loadAudit(),
+        loadPrescriptions(),
+        loadRadiographs(),
+        loadPerioCharts(),
+        loadTreatmentPlans(),
+        loadChairs(),
       ]);
     } catch (e) {
       window.alert(
@@ -316,7 +293,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  }, [loadPatients, loadServices, loadAppointments, loadNotes, loadInvoices, loadAudit]);
+  }, [
+    loadPatients,
+    loadServices,
+    loadAppointments,
+    loadNotes,
+    loadInvoices,
+    loadAudit,
+    loadPrescriptions,
+    loadRadiographs,
+    loadPerioCharts,
+    loadTreatmentPlans,
+    loadChairs,
+  ]);
 
   useEffect(() => {
     void refreshAll();
@@ -508,166 +497,120 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  // Clinical Suite Actions
-  const addPrescription = (
-    data: Omit<DentalPrescription, 'id' | 'createdAt' | 'tenantId'>,
-  ): DentalPrescription => {
-    const newRx: DentalPrescription = {
-      ...data,
-      id: `rx_${Date.now()}`,
-      tenantId: currentTenantId,
-      createdAt: new Date().toISOString(),
-    };
-    setAllPrescriptions((prev) => [newRx, ...prev]);
-    logAuditEvent(
-      'PRESCRIPTION_CREATED',
-      'Prescription',
-      newRx.id,
-      `Issued e-Rx for ${newRx.patientName} (${newRx.items.length} prescribed items)`,
-    );
-    return newRx;
+  // Clinical Suite Actions — API-backed (server audits + scopes each write).
+  // The `add*` helpers alert on failure and rethrow so the calling modal can skip its
+  // success path; `delete*` go through `guard` (alert, no rethrow).
+  const _mutate = async <T,>(run: () => Promise<T>, fail: string): Promise<T> => {
+    try {
+      return await run();
+    } catch (err) {
+      window.alert(err instanceof ApiError ? String(err.detail) : fail);
+      throw err;
+    }
   };
 
-  const deletePrescription = (id: string) => {
-    setAllPrescriptions((prev) => prev.filter((p) => p.id !== id));
-    logAuditEvent('PRESCRIPTION_DELETED', 'Prescription', id, 'Deleted prescription record');
+  const addPrescription = (
+    data: Omit<DentalPrescription, 'id' | 'createdAt' | 'tenantId'>,
+  ): Promise<DentalPrescription> =>
+    _mutate(async () => {
+      const created = await api<DentalPrescription>('/prescriptions', { method: 'POST', body: data });
+      await loadPrescriptions();
+      return created;
+    }, 'Failed to save the prescription.');
+
+  const deletePrescription = async (id: string) => {
+    await guard(async () => {
+      await api(`/prescriptions/${id}`, { method: 'DELETE' });
+      await loadPrescriptions();
+    });
   };
 
   const addRadiograph = (
     data: Omit<DentalRadiograph, 'id' | 'tenantId'>,
-  ): DentalRadiograph => {
-    const newRad: DentalRadiograph = {
-      ...data,
-      id: `rad_${Date.now()}`,
-      tenantId: currentTenantId,
-    };
-    setAllRadiographs((prev) => [newRad, ...prev]);
-    logAuditEvent(
-      'RADIOGRAPH_UPLOADED',
-      'Radiograph',
-      newRad.id,
-      `Uploaded ${newRad.category}: ${newRad.title}`,
-    );
-    return newRad;
-  };
+  ): Promise<DentalRadiograph> =>
+    _mutate(async () => {
+      const created = await api<DentalRadiograph>('/radiographs', { method: 'POST', body: data });
+      await loadRadiographs();
+      return created;
+    }, 'Failed to save the radiograph.');
 
-  const deleteRadiograph = (id: string) => {
-    setAllRadiographs((prev) => prev.filter((r) => r.id !== id));
-    logAuditEvent('RADIOGRAPH_DELETED', 'Radiograph', id, 'Deleted radiograph record');
+  const deleteRadiograph = async (id: string) => {
+    await guard(async () => {
+      await api(`/radiographs/${id}`, { method: 'DELETE' });
+      await loadRadiographs();
+    });
   };
 
   const savePerioChart = (
     chart: Omit<PeriodontalChart, 'id' | 'tenantId'> & { id?: string },
-  ): PeriodontalChart => {
-    const chartId = chart.id || `perio_${Date.now()}`;
-    const newChart: PeriodontalChart = {
-      ...chart,
-      id: chartId,
-      tenantId: currentTenantId,
-    };
-    setAllPerioCharts((prev) => {
-      const exists = prev.some((c) => c.id === chartId);
-      if (exists) {
-        return prev.map((c) => (c.id === chartId ? newChart : c));
-      }
-      return [newChart, ...prev];
-    });
-    logAuditEvent(
-      'PERIO_CHART_UPDATED',
-      'PerioChart',
-      chartId,
-      `Updated periodontal probing exam on ${newChart.examDate}`,
-    );
-    return newChart;
-  };
+  ): Promise<PeriodontalChart> =>
+    _mutate(async () => {
+      const { id, tenantId: _t, ...body } = chart as PeriodontalChart;
+      const saved = id
+        ? await api<PeriodontalChart>(`/perio-charts/${id}`, { method: 'PATCH', body })
+        : await api<PeriodontalChart>('/perio-charts', { method: 'POST', body });
+      await loadPerioCharts();
+      return saved;
+    }, 'Failed to save the periodontal chart.');
 
   const addTreatmentPlan = (
     data: Omit<PatientTreatmentPlan, 'id' | 'tenantId'>,
-  ): PatientTreatmentPlan => {
-    const newPlan: PatientTreatmentPlan = {
-      ...data,
-      id: `tp_${Date.now()}`,
-      tenantId: currentTenantId,
-    };
-    setAllTreatmentPlans((prev) => [newPlan, ...prev]);
-    logAuditEvent(
-      'TREATMENT_PLAN_CREATED',
-      'TreatmentPlan',
-      newPlan.id,
-      `Created treatment plan: ${newPlan.title}`,
-    );
-    return newPlan;
-  };
+  ): Promise<PatientTreatmentPlan> =>
+    _mutate(async () => {
+      const created = await api<PatientTreatmentPlan>('/treatment-plans', { method: 'POST', body: data });
+      await loadTreatmentPlans();
+      return created;
+    }, 'Failed to save the treatment plan.');
 
-  const updateTreatmentPlanItemStatus = (
+  const _acceptedFee = (phases: PatientTreatmentPlan['phases'], counted: TreatmentPlanItem['status'][]) =>
+    phases.reduce(
+      (sum, ph) => sum + ph.items.filter((it) => counted.includes(it.status)).reduce((s, it) => s + it.estimatedFee, 0),
+      0,
+    );
+
+  const updateTreatmentPlanItemStatus = async (
     planId: string,
     phaseId: string,
     itemId: string,
     status: TreatmentPlanItem['status'],
   ) => {
-    setAllTreatmentPlans((prev) =>
-      prev.map((plan) => {
-        if (plan.id !== planId) return plan;
-        const updatedPhases = plan.phases.map((phase) => {
-          if (phase.id !== phaseId) return phase;
-          const updatedItems = phase.items.map((item) => {
-            if (item.id !== itemId) return item;
-            return { ...item, status };
-          });
-          return { ...phase, items: updatedItems };
-        });
-
-        const acceptedFee = updatedPhases.reduce(
-          (sum, ph) =>
-            sum +
-            ph.items
-              .filter(
-                (it) =>
-                  it.status === 'Accepted' ||
-                  it.status === 'In-Progress' ||
-                  it.status === 'Completed',
-              )
-              .reduce((s, it) => s + it.estimatedFee, 0),
-          0,
-        );
-
-        return { ...plan, phases: updatedPhases, acceptedFee };
-      }),
+    const plan = treatmentPlans.find((p) => p.id === planId);
+    if (!plan) return;
+    const phases = plan.phases.map((phase) =>
+      phase.id !== phaseId
+        ? phase
+        : { ...phase, items: phase.items.map((it) => (it.id === itemId ? { ...it, status } : it)) },
     );
-    logAuditEvent('TREATMENT_PLAN_UPDATED', 'TreatmentPlan', planId, `Updated procedure status to ${status}`);
+    const acceptedFee = _acceptedFee(phases, ['Accepted', 'In-Progress', 'Completed']);
+    await guard(async () => {
+      await api(`/treatment-plans/${planId}`, { method: 'PATCH', body: { phases, acceptedFee } });
+      await loadTreatmentPlans();
+    });
   };
 
-  const acceptTreatmentPlan = (planId: string) => {
-    setAllTreatmentPlans((prev) =>
-      prev.map((plan) => {
-        if (plan.id === planId) {
-          const updatedPhases = plan.phases.map((ph) => ({
-            ...ph,
-            items: ph.items.map((it) => ({
-              ...it,
-              status: (it.status === 'Proposed' ? 'Accepted' : it.status) as TreatmentPlanItem['status'],
-            })),
-          }));
-          const acceptedFee = updatedPhases.reduce(
-            (sum, ph) =>
-              sum +
-              ph.items
-                .filter((it) => it.status !== 'Declined' && it.status !== 'Proposed')
-                .reduce((s, it) => s + it.estimatedFee, 0),
-            0,
-          );
-          return {
-            ...plan,
-            status: 'Accepted' as const,
-            patientAcceptedDate: new Date().toISOString().split('T')[0],
-            phases: updatedPhases,
-            acceptedFee,
-          };
-        }
-        return plan;
-      }),
-    );
-    logAuditEvent('TREATMENT_PLAN_UPDATED', 'TreatmentPlan', planId, 'Patient accepted clinical treatment plan');
+  const acceptTreatmentPlan = async (planId: string) => {
+    const plan = treatmentPlans.find((p) => p.id === planId);
+    if (!plan) return;
+    const phases = plan.phases.map((ph) => ({
+      ...ph,
+      items: ph.items.map((it) => ({
+        ...it,
+        status: (it.status === 'Proposed' ? 'Accepted' : it.status) as TreatmentPlanItem['status'],
+      })),
+    }));
+    const acceptedFee = _acceptedFee(phases, ['Accepted', 'In-Progress', 'Completed']);
+    await guard(async () => {
+      await api(`/treatment-plans/${planId}`, {
+        method: 'PATCH',
+        body: {
+          status: 'Accepted',
+          patientAcceptedDate: new Date().toISOString().split('T')[0],
+          phases,
+          acceptedFee,
+        },
+      });
+      await loadTreatmentPlans();
+    });
   };
 
   // Waiting Room Queue Actions
@@ -697,66 +640,47 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Operatory Chair Scaling & Configuration
-  const addOperatoryChair = (
+  // Operatory Chair Scaling & Configuration — persisted via /operatory-chairs.
+  const _chairColor = (t: OperatoryChairType) =>
+    t === 'Hygiene' ? 'sky' : t === 'Surgery' ? 'rose' : t === 'Orthodontics' ? 'indigo' : 'emerald';
+
+  const addOperatoryChair = async (
     name: string,
     chairType: OperatoryChairType,
     roomNumber?: string,
-  ): { success: boolean; message?: string; chair?: OperatoryChairConfig } => {
+  ): Promise<{ success: boolean; message?: string; chair?: OperatoryChairConfig }> => {
     const currentLimit = currentTenant?.subscription?.chairLimit || 6;
-    const activeChairs = operatoryChairs.filter((c) => c.isActive);
-
-    if (activeChairs.length >= currentLimit) {
+    if (operatoryChairs.filter((c) => c.isActive).length >= currentLimit) {
       return {
         success: false,
         message: `Plan chair quota (${currentLimit} chairs) reached for ${currentTenant?.name || 'clinic'}. Please upgrade subscription plan to activate more chairs.`,
       };
     }
-
-    const newChair: OperatoryChairConfig = {
-      id: `chair_${Date.now()}`,
-      tenantId: currentTenantId,
-      name: name.trim(),
-      roomNumber: roomNumber?.trim(),
-      chairType,
-      isActive: true,
-      color:
-        chairType === 'Hygiene'
-          ? 'sky'
-          : chairType === 'Surgery'
-          ? 'rose'
-          : chairType === 'Orthodontics'
-          ? 'indigo'
-          : 'emerald',
-    };
-
-    setAllOperatoryChairs((prev) => [...prev, newChair]);
-    logAuditEvent(
-      'CHAIR_CREATED',
-      'Chair',
-      newChair.id,
-      `Configured new operatory [${newChair.name}] (${chairType}, ${roomNumber || 'No room'})`,
-    );
-    return { success: true, chair: newChair };
+    try {
+      const chair = await api<OperatoryChairConfig>('/operatory-chairs', {
+        method: 'POST',
+        body: { name: name.trim(), chairType, roomNumber: roomNumber?.trim(), isActive: true, color: _chairColor(chairType) },
+      });
+      await loadChairs();
+      return { success: true, chair };
+    } catch (err) {
+      return { success: false, message: err instanceof ApiError ? String(err.detail) : 'Failed to add chair.' };
+    }
   };
 
-  const updateOperatoryChair = (id: string, updates: Partial<OperatoryChairConfig>) => {
-    setAllOperatoryChairs((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const updated = { ...c, ...updates };
-          logAuditEvent('CHAIR_UPDATED', 'Chair', id, `Updated operatory [${updated.name}]`);
-          return updated;
-        }
-        return c;
-      }),
-    );
+  const updateOperatoryChair = async (id: string, updates: Partial<OperatoryChairConfig>) => {
+    if (id.startsWith('chair_default_')) return; // fallback placeholder, not a real row
+    await guard(async () => {
+      await api(`/operatory-chairs/${id}`, { method: 'PATCH', body: updates });
+      await loadChairs();
+    });
   };
 
-  const deleteOperatoryChair = (id: string): { success: boolean; message?: string } => {
-    const chair = allOperatoryChairs.find((c) => c.id === id);
+  const deleteOperatoryChair = async (
+    id: string,
+  ): Promise<{ success: boolean; message?: string }> => {
+    const chair = operatoryChairs.find((c) => c.id === id);
     if (!chair) return { success: false, message: 'Chair not found.' };
-
     const inChairApt = appointments.find(
       (a) => a.operatoryChair === chair.name && a.status === 'In-Chair',
     );
@@ -766,94 +690,52 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         message: `Cannot delete ${chair.name} because patient ${inChairApt.patientName} is currently in-chair.`,
       };
     }
-
-    setAllOperatoryChairs((prev) => prev.filter((c) => c.id !== id));
-    logAuditEvent('CHAIR_DELETED', 'Chair', id, `Removed operatory chair [${chair.name}]`);
-    return { success: true };
+    try {
+      await api(`/operatory-chairs/${id}`, { method: 'DELETE' });
+      await loadChairs();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof ApiError ? String(err.detail) : 'Failed to remove chair.' };
+    }
   };
 
   // Insurance Claims
-  const updateInvoiceInsuranceClaim = (
+  const updateInvoiceInsuranceClaim = async (
     invoiceId: string,
     claimData: Partial<NonNullable<Invoice['insuranceClaim']>>,
   ) => {
+    const target = invoices.find((i) => i.id === invoiceId);
+    if (!target) return;
+    const currentClaim = target.insuranceClaim || {
+      claimId: `clm_${Date.now()}`,
+      claimNumber: `CLM-${Date.now().toString().slice(-6)}`,
+      payerName: 'Primary Insurance',
+      policyNumber: '',
+      status: 'Draft' as const,
+      claimedAmount: target.amount,
+      notes: '',
+    };
+    const updatedClaim = { ...currentClaim, ...claimData };
+    // optimistic; server is source of truth on reload
     setInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id === invoiceId) {
-          const currentClaim = inv.insuranceClaim || {
-            claimId: `clm_${Date.now()}`,
-            claimNumber: `CLM-${Date.now().toString().slice(-6)}`,
-            payerName: 'Primary Insurance',
-            policyNumber: '',
-            status: 'Draft' as const,
-            claimedAmount: inv.amount,
-            notes: '',
-          };
-          const updatedClaim = { ...currentClaim, ...claimData };
-          const updatedInvoice = { ...inv, insuranceClaim: updatedClaim };
-          logAuditEvent(
-            'CLAIM_SUBMITTED',
-            'Claim',
-            invoiceId,
-            `Updated insurance claim for invoice ${inv.invoiceNumber} (${updatedClaim.status})`,
-          );
-          return updatedInvoice;
-        }
-        return inv;
-      }),
+      prev.map((inv) => (inv.id === invoiceId ? { ...inv, insuranceClaim: updatedClaim } : inv)),
     );
-  };
-
-  // Backup restore
-  const restoreBackupData = (backupData: any): { success: boolean; message?: string } => {
     try {
-      if (!backupData || typeof backupData !== 'object') {
-        return { success: false, message: 'Invalid backup file payload format.' };
-      }
-      const targetClinicId = currentTenantId;
-
-      if (backupData.prescriptions && Array.isArray(backupData.prescriptions)) {
-        setAllPrescriptions((prev) => [
-          ...prev.filter((p) => p.tenantId !== targetClinicId),
-          ...backupData.prescriptions.map((p: any) => ({ ...p, tenantId: targetClinicId })),
-        ]);
-      }
-      if (backupData.radiographs && Array.isArray(backupData.radiographs)) {
-        setAllRadiographs((prev) => [
-          ...prev.filter((r) => r.tenantId !== targetClinicId),
-          ...backupData.radiographs.map((r: any) => ({ ...r, tenantId: targetClinicId })),
-        ]);
-      }
-      if (backupData.perioCharts && Array.isArray(backupData.perioCharts)) {
-        setAllPerioCharts((prev) => [
-          ...prev.filter((pc) => pc.tenantId !== targetClinicId),
-          ...backupData.perioCharts.map((pc: any) => ({ ...pc, tenantId: targetClinicId })),
-        ]);
-      }
-      if (backupData.treatmentPlans && Array.isArray(backupData.treatmentPlans)) {
-        setAllTreatmentPlans((prev) => [
-          ...prev.filter((tp) => tp.tenantId !== targetClinicId),
-          ...backupData.treatmentPlans.map((tp: any) => ({ ...tp, tenantId: targetClinicId })),
-        ]);
-      }
-      if (backupData.operatoryChairs && Array.isArray(backupData.operatoryChairs)) {
-        setAllOperatoryChairs((prev) => [
-          ...prev.filter((ch) => ch.tenantId !== targetClinicId),
-          ...backupData.operatoryChairs.map((ch: any) => ({ ...ch, tenantId: targetClinicId })),
-        ]);
-      }
-
-      logAuditEvent(
-        'BACKUP_RESTORED',
-        'Backup',
-        undefined,
-        `Successfully restored clinic data archive for tenant ${targetClinicId}`,
-      );
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, message: err?.message || 'Failed restoring backup.' };
+      await api(`/invoices/${invoiceId}`, { method: 'PATCH', body: { insuranceClaim: updatedClaim } });
+      await loadInvoices();
+    } catch (err) {
+      window.alert(err instanceof ApiError ? err.detail : 'Failed to save the insurance claim.');
+      await loadInvoices();
     }
   };
+
+  // Backup restore — export still works; bulk restore is disabled now that clinical
+  // records live on the server (a real restore path needs a server bulk-import endpoint).
+  const restoreBackupData = (_backupData: any): { success: boolean; message?: string } => ({
+    success: false,
+    message:
+      'Restore from file is disabled — clinical records now sync to the server. Export remains available for your own archives.',
+  });
 
   return (
     <DataContext.Provider
@@ -875,16 +757,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         treatmentPlans,
         operatoryChairs,
 
-        // Global lists / Backups
+        // Global lists / Backups (server already tenant-scopes these)
         allPatients: patients,
         allAppointments: appointments,
         allInvoices: invoices,
         allClinicalNotes: clinicalNotes,
-        allOperatoryChairs,
-        allPrescriptions,
-        allRadiographs,
-        allPerioCharts,
-        allTreatmentPlans,
+        allOperatoryChairs: operatoryChairs,
+        allPrescriptions: prescriptions,
+        allRadiographs: radiographs,
+        allPerioCharts: perioCharts,
+        allTreatmentPlans: treatmentPlans,
 
         addPatient,
         updatePatient,

@@ -74,10 +74,16 @@ Local port is **8001** (8000 is used by another project on this machine). The fr
 | GET / POST | `/services` · PATCH `/services/{id}` | `canManageServices` (unique CDT code / clinic) |
 | GET / POST / PATCH / DELETE | `/appointments` (+ `?date=`, `?patient_id=`) | `canManageAppointments` |
 | POST | `/appointments/check-conflict` | `canManageAppointments` |
-| GET / POST / DELETE | `/invoices` | `canViewRevenue` |
+| GET / POST / PATCH / DELETE | `/invoices` | `canViewRevenue` (POST also `canManagePatients`) |
 | POST | `/invoices/{id}/payments` · `/invoices/{id}/mark-paid` | `canViewRevenue` |
+| PATCH | `/invoices/{id}` — insurance-claim blob only | `canViewRevenue` |
 | GET | `/clinical-notes` (+ `?patient_id=`) | `canManagePatients` |
 | POST | `/clinical-notes` | `canWriteDoctorNotes` |
+| GET / POST / DELETE | `/prescriptions` (+ `?patient_id=`) | read `canManagePatients` · write `canWriteDoctorNotes` |
+| GET / POST / PATCH / DELETE | `/radiographs` (+ `?patient_id=`) | read `canManagePatients` · write `canWriteDoctorNotes` |
+| GET / POST / PATCH / DELETE | `/perio-charts` (+ `?patient_id=`) | read `canManagePatients` · write `canWriteDoctorNotes` |
+| GET / POST / PATCH / DELETE | `/treatment-plans` (+ `?patient_id=`) | `canManagePatients` |
+| GET / POST / PATCH / DELETE | `/operatory-chairs` | read: any bearer · write `canManageServices` |
 | GET | `/tenants` | bearer (Super Admin -> all; others -> own only) |
 | POST / PATCH | `/tenants` · `/tenants/{id}` | Super Admin (onboard; status / plan / subscription) |
 | POST | `/tenants/{id}/assign-doctor-admin` | Super Admin — `{userId}` |

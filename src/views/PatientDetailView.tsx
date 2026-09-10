@@ -672,8 +672,9 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  savePerioChart(workingPerio);
-                  alert('Periodontal probing examination saved successfully!');
+                  savePerioChart(workingPerio)
+                    .then(() => alert('Periodontal probing examination saved successfully!'))
+                    .catch(() => undefined);
                 }}
                 className="flex items-center space-x-1.5 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-2xl text-xs font-bold transition-all shadow-md shadow-primary-600/20"
               >

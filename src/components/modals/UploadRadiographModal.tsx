@@ -89,10 +89,12 @@ export const UploadRadiographModal: React.FC<UploadRadiographModalProps> = ({
       findings: findings.trim() || 'No active radiolucency detected; normal bone architecture.',
       takenBy: currentUser.name,
       notes: notes.trim(),
-    });
-
-    if (onUploadSuccess) onUploadSuccess();
-    onClose();
+    })
+      .then(() => {
+        if (onUploadSuccess) onUploadSuccess();
+        onClose();
+      })
+      .catch(() => undefined);
   };
 
   return (

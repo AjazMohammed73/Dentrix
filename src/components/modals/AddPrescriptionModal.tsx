@@ -180,29 +180,32 @@ export const AddPrescriptionModal: React.FC<AddPrescriptionModalProps> = ({
     setItems((prev) => prev.filter((it) => it.id !== id));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) {
       alert('Please add at least one medication to the prescription.');
       return;
     }
 
-    const newRx = addPrescription({
-      patientId,
-      patientName,
-      doctorId: currentUser.id,
-      doctorName: currentUser.name,
-      doctorRegistrationNumber: 'DCI Reg #29481-A',
-      date: new Date().toISOString().split('T')[0],
-      diagnosis: diagnosis.trim() || 'Acute Odontogenic Condition',
-      items,
-      notes: notes.trim(),
-    });
-
-    if (onPrescriptionCreated) {
-      onPrescriptionCreated(newRx.id);
+    try {
+      const newRx = await addPrescription({
+        patientId,
+        patientName,
+        doctorId: currentUser.id,
+        doctorName: currentUser.name,
+        doctorRegistrationNumber: 'DCI Reg #29481-A',
+        date: new Date().toISOString().split('T')[0],
+        diagnosis: diagnosis.trim() || 'Acute Odontogenic Condition',
+        items,
+        notes: notes.trim(),
+      });
+      if (onPrescriptionCreated) {
+        onPrescriptionCreated(newRx.id);
+      }
+      onClose();
+    } catch {
+      /* addPrescription already alerted; keep the modal open */
     }
-    onClose();
   };
 
   return (

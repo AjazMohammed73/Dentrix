@@ -131,10 +131,12 @@ export const AddTreatmentPlanModal: React.FC<AddTreatmentPlanModalProps> = ({
       totalEstimatedFee,
       acceptedFee: 0,
       status: 'Proposed' as any,
-    });
-
-    if (onSuccess) onSuccess();
-    onClose();
+    })
+      .then(() => {
+        if (onSuccess) onSuccess();
+        onClose();
+      })
+      .catch(() => undefined);
   };
 
   return (

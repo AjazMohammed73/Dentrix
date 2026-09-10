@@ -3,7 +3,7 @@
 Working notes for anyone (human or AI) picking this up. Read this + `PRE_LAUNCH.md`
 + `backend/README.md` and you're caught up.
 
-_Last updated: 2026-09-10 (security hardening round 2)_
+_Last updated: 2026-09-11 (clinical-suite APIs + hybrid seam fixes)_
 
 ---
 
@@ -288,6 +288,44 @@ injection (parameterised throughout); stored XSS (React auto-escapes, no
   can't steal a long-lived credential, and there's no persisted token to lift.
 - **Body cap** — pure-ASGI middleware: 1 MB, honours `Content-Length` and caps the actual
   chunked stream, drains the rest so the client gets a clean 413.
+
+## Clinical-suite APIs + seam fixes (2026-09-11)
+
+A teammate's earlier merge (`a69d5aa` "unify backend…", `f6497d7`) folded a large
+localStorage/mock frontend feature drop (prescriptions, radiographs, perio charts,
+treatment plans, operatory-chair config + ~14 modals) on top of the API-backed core.
+This pass unified it.
+
+**Seam fixes**
+- `schemas/common.py::OperatoryChair` is now a bounded free-form `str` (1–40 chars),
+  not a 3-value `Literal` — clinics can name/add their own chairs without a 422 on booking.
+- New `PATCH /invoices/{id}` (insurance-claim JSONB only; `canViewRevenue`, tenant-scoped,
+  audited `INVOICE_UPDATED`). `DataContext.updateInvoiceInsuranceClaim` now persists.
+- `DataContext` hands a brand-new clinic 3 default chairs (bound to the live tenant) until
+  it configures its own — keeps the booking dropdown populated.
+
+**New API domains** — migration `c7d8e9f0a1b2_clinical_suite_tables` (5 tables; nested
+structures as JSONB, scalars flat). Per-domain model + schema + router, tenant-scoped,
+audited, `SUPER_ADMIN` blocked on writes (clinic-owned data):
+| Endpoint | Read gate | Write gate |
+|---|---|---|
+| `/prescriptions` (`?patient_id=`) | `canManagePatients` | `canWriteDoctorNotes` |
+| `/radiographs` (`?patient_id=`) | `canManagePatients` | `canWriteDoctorNotes` |
+| `/perio-charts` (`?patient_id=`) | `canManagePatients` | `canWriteDoctorNotes` |
+| `/treatment-plans` (`?patient_id=`) | `canManagePatients` | `canManagePatients` |
+| `/operatory-chairs` | any bearer | `canManageServices` |
+
+- Radiograph images: base64 data URL in a `TEXT` column, ~7.5 MB cap (matches the
+  frontend's 5 MB binary limit). `ponytail:` move to S3/R2 + store the key when images
+  get large/numerous.
+- `DataContext` rewired: the 5 feature arrays load from the API in `refreshAll`; every
+  mutation (`addPrescription`, `savePerioChart`, `updateTreatmentPlanItemStatus`,
+  `addOperatoryChair`, …) is now `async` → API call + reload. `src/data/mockData.ts`
+  **deleted** (dead). `src/utils/storage.ts` kept only for `StorageMonitor`.
+- `restoreBackupData` is now a no-op that reports restore-from-file is disabled (export
+  still works). A real bulk-import endpoint is future work.
+- New audit actions: `PRESCRIPTION_*`, `RADIOGRAPH_*`, `PERIO_CHART_*`,
+  `TREATMENT_PLAN_*`, `CHAIR_*`, `INVOICE_UPDATED`.
 
 ## Security hardening — round 2 (2026-09-10)
 

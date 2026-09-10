@@ -64,14 +64,14 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
     setErrorMessage(null);
   };
 
-  const handleAddChair = (e: React.FormEvent) => {
+  const handleAddChair = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) {
       setErrorMessage('Please enter an operatory chair name.');
       return;
     }
 
-    const res = addOperatoryChair(newName.trim(), newType, newRoom.trim() || undefined);
+    const res = await addOperatoryChair(newName.trim(), newType, newRoom.trim() || undefined);
     if (!res.success) {
       setErrorMessage(res.message || 'Failed to add operatory chair.');
       return;
@@ -84,9 +84,9 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
     setErrorMessage(null);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to remove ${name}?`)) {
-      const res = deleteOperatoryChair(id);
+      const res = await deleteOperatoryChair(id);
       if (!res.success) {
         setErrorMessage(res.message || 'Could not delete chair.');
       } else {

@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 
@@ -22,7 +22,9 @@ ServiceCategory = Literal[
     "Oral Surgery",
     "Orthodontics",
 ]
-OperatoryChair = Literal["Chair 1 - Hygiene", "Chair 2 - Surgery", "Chair 3 - General"]
+# Free-form: clinics name/add their own chairs via the frontend ManageChairs UI.
+# Bounded to the DB column width; the booking conflict check compares the raw string.
+OperatoryChair = Annotated[str, Field(min_length=1, max_length=40)]
 AppointmentStatus = Literal[
     "Scheduled", "Arrived", "In-Chair", "Delayed", "Completed", "Cancelled", "No-Show"
 ]

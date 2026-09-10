@@ -33,6 +33,12 @@ class InvoiceCreate(CamelModel):
     payment_method: InstallmentMethod | None = None
 
 
+class InvoiceUpdate(CamelModel):
+    # Only the insurance-claim blob is client-editable post-creation; amounts/balance
+    # are driven by payments. Shape is validated on the frontend (ClaimSettlementModal).
+    insurance_claim: dict | None = None
+
+
 class InvoicePaymentRequest(CamelModel):
     amount: int = Field(gt=0, le=_MAX_MONEY)
     method: InstallmentMethod
