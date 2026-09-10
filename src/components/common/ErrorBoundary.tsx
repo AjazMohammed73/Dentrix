@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, RefreshCw, LogOut } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -31,14 +31,17 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
-  private handleResetLocalState = () => {
-    if (window.confirm('Reset local application cache and restore defaults? Your patient data will be reloaded from clean clinic defaults.')) {
-      localStorage.removeItem('dentrix_patients');
-      localStorage.removeItem('dentrix_appointments');
-      localStorage.removeItem('dentrix_invoices');
-      localStorage.removeItem('dentrix_clinical_notes');
-      localStorage.removeItem('dentrix_services');
-      localStorage.removeItem('dentrix_system_health');
+  private handleSignOutReload = () => {
+    if (
+      window.confirm(
+        'Sign out and reload the app? Your clinic data is stored on the server and is not affected.',
+      )
+    ) {
+      try {
+        sessionStorage.removeItem('dentrix_token');
+      } catch {
+        /* storage unavailable */
+      }
       window.location.reload();
     }
   };
@@ -77,11 +80,11 @@ export class ErrorBoundary extends Component<Props, State> {
               </button>
 
               <button
-                onClick={this.handleResetLocalState}
+                onClick={this.handleSignOutReload}
                 className="w-full flex items-center justify-center space-x-2 bg-slate-700/60 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl text-xs font-semibold transition-all border border-slate-600/50"
               >
-                <Trash2 size={14} className="text-rose-400" />
-                <span>Reset Local Cache & Recover</span>
+                <LogOut size={14} className="text-rose-400" />
+                <span>Sign Out & Reload</span>
               </button>
             </div>
 

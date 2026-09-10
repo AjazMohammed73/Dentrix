@@ -3,6 +3,7 @@ import { X, FileText, Stethoscope, CheckCircle2, ShieldAlert, Layers } from 'luc
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { Patient, ToothSurface } from '../../types';
+import { todayISO } from '../../utils/format';
 
 interface AddClinicalNoteModalProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export const AddClinicalNoteModal: React.FC<AddClinicalNoteModalProps> = ({
       patientId: patient.id,
       doctorId: currentUser.id,
       doctorName: currentUser.name,
-      date: new Date().toISOString().split('T')[0],
+      date: todayISO(),
       toothNumber,
       toothNumbers: num ? [num] : undefined,
       toothSurfaces: selectedSurfaces.length > 0 ? selectedSurfaces : undefined,

@@ -30,7 +30,7 @@ import { StorageMonitor } from './components/common/StorageMonitor';
 import { Invoice } from './types';
 
 const AppContent: React.FC = () => {
-  const { currentUser, currentTenant, isAuthenticated } = useAuth();
+  const { currentUser, currentTenant, isAuthenticated, loading } = useAuth();
   const [showLandingPage, setShowLandingPage] = useState<boolean>(true);
   const [isSignInOpen, setIsSignInOpen] = useState<boolean>(false);
   const [currentRoute, setCurrentRoute] = useState<NavRoute>('dashboard');
@@ -125,7 +125,15 @@ const AppContent: React.FC = () => {
     setShowLandingPage(true);
   };
 
-  if (showLandingPage) {
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#F8F9FA] text-slate-500 text-sm font-semibold">
+        Loading Dentrix…
+      </div>
+    );
+  }
+
+  if (showLandingPage || !isAuthenticated) {
     return (
       <>
         <LandingPageView
@@ -145,193 +153,189 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] text-slate-800">
-      {/* Persistent Left Sidebar */}
-      <Sidebar
-        currentRoute={currentRoute}
-        onNavigate={handleNavigate}
-        onSignOut={handleSignOut}
-      />
-
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Header */}
-        <TopHeader
-          onQuickBook={handleQuickBook}
-          onOpenCreateInvoice={() => handleOpenCreateInvoice()}
-          onViewLandingPage={() => setShowLandingPage(true)}
-          onSignOut={handleSignOut}
-          onSelectPatient={handleSelectPatient}
+    <DataProvider>
+      <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] text-slate-800">
+        {/* Persistent Left Sidebar */}
+        <Sidebar
+          currentRoute={currentRoute}
           onNavigate={handleNavigate}
-          onLockWorkstation={handleLockWorkstation}
-          onOpenBackup={() => setIsBackupModalOpen(true)}
+          onSignOut={handleSignOut}
         />
 
-        {/* Dynamic Route Content */}
-        <main className="flex-1 overflow-y-auto">
-          {/* Patient Detail Sub-route */}
-          {selectedPatientId ? (
-            <PatientDetailView
-              patientId={selectedPatientId}
-              onBack={() => setSelectedPatientId(null)}
-              onBookAppointment={handleBookForPatient}
-              onOpenCreateInvoice={handleOpenCreateInvoice}
-            />
-          ) : (
-            <>
-              {currentRoute === 'dashboard' && (
-                <DashboardView
-                  onNavigate={handleNavigate}
-                  onBookAppointment={handleQuickBook}
-                  onSelectPatient={handleSelectPatient}
-                  onOpenCreateInvoice={() => handleOpenCreateInvoice()}
-                />
-              )}
+        {/* Main Container */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Top Header */}
+          <TopHeader
+            onQuickBook={handleQuickBook}
+            onOpenCreateInvoice={() => handleOpenCreateInvoice()}
+            onViewLandingPage={() => setShowLandingPage(true)}
+            onSignOut={handleSignOut}
+          />
 
-              {currentRoute === 'appointments' && (
-                <AppointmentsView
-                  onBookAppointment={handleQuickBook}
-                  onSelectPatient={handleSelectPatient}
-                />
-              )}
+          {/* Dynamic Route Content */}
+          <main className="flex-1 overflow-y-auto">
+            {/* Patient Detail Sub-route */}
+            {selectedPatientId ? (
+              <PatientDetailView
+                patientId={selectedPatientId}
+                onBack={() => setSelectedPatientId(null)}
+                onBookAppointment={handleBookForPatient}
+                onOpenCreateInvoice={handleOpenCreateInvoice}
+              />
+            ) : (
+              <>
+                {currentRoute === 'dashboard' && (
+                  <DashboardView
+                    onNavigate={handleNavigate}
+                    onBookAppointment={handleQuickBook}
+                    onSelectPatient={handleSelectPatient}
+                    onOpenCreateInvoice={() => handleOpenCreateInvoice()}
+                  />
+                )}
 
-              {currentRoute === 'patients' && (
-                <PatientsView
-                  onSelectPatient={handleSelectPatient}
-                  onOpenAddPatient={() => setIsAddPatientOpen(true)}
-                  onOpenCreateInvoice={handleOpenCreateInvoice}
-                />
-              )}
+                {currentRoute === 'appointments' && (
+                  <AppointmentsView
+                    onBookAppointment={handleQuickBook}
+                    onSelectPatient={handleSelectPatient}
+                  />
+                )}
 
-              {currentRoute === 'revenue' && (
-                <RevenueView onNavigateHome={() => handleNavigate('dashboard')} />
-              )}
+                {currentRoute === 'patients' && (
+                  <PatientsView
+                    onSelectPatient={handleSelectPatient}
+                    onOpenAddPatient={() => setIsAddPatientOpen(true)}
+                    onOpenCreateInvoice={handleOpenCreateInvoice}
+                  />
+                )}
 
-              {currentRoute === 'staff' && (
-                <StaffView
-                  onOpenAddStaff={() => setIsAddStaffOpen(true)}
-                  onNavigateHome={() => handleNavigate('dashboard')}
-                />
-              )}
+                {currentRoute === 'revenue' && (
+                  <RevenueView onNavigateHome={() => handleNavigate('dashboard')} />
+                )}
 
-              {currentRoute === 'services' && (
-                <ServicesView
-                  onOpenAddService={() => setIsAddServiceOpen(true)}
-                  onNavigateHome={() => handleNavigate('dashboard')}
-                />
-              )}
+                {currentRoute === 'staff' && (
+                  <StaffView
+                    onOpenAddStaff={() => setIsAddStaffOpen(true)}
+                    onNavigateHome={() => handleNavigate('dashboard')}
+                  />
+                )}
 
-              {currentRoute === 'tenants' && (
-                <SuperAdminView
-                  onOpenOnboardModal={() => setIsOnboardTenantOpen(true)}
-                  onNavigateHome={() => handleNavigate('dashboard')}
-                />
-              )}
-            </>
-          )}
-        </main>
+                {currentRoute === 'services' && (
+                  <ServicesView
+                    onOpenAddService={() => setIsAddServiceOpen(true)}
+                    onNavigateHome={() => handleNavigate('dashboard')}
+                  />
+                )}
 
-        {/* Clinic Status & Storage Telemetry Footer */}
-        <footer className="h-7 bg-white border-t border-border px-4 flex items-center justify-between text-[11px] text-slate-500 z-10 flex-shrink-0 select-none">
-          <div className="flex items-center space-x-3">
-            <span className="font-bold text-slate-700">Dentrix Clinical OS</span>
-            <span className="text-slate-300">•</span>
-            <span className="font-medium text-slate-600">{currentTenant?.name || 'Apex Dental'}</span>
-            <span className="text-slate-300">•</span>
-            <span className="hidden sm:inline text-emerald-700 font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-              IndexedDB Mirror Active
-            </span>
-          </div>
+                {currentRoute === 'tenants' && (
+                  <SuperAdminView
+                    onOpenOnboardModal={() => setIsOnboardTenantOpen(true)}
+                    onNavigateHome={() => handleNavigate('dashboard')}
+                  />
+                )}
+              </>
+            )}
+          </main>
 
-          <div className="flex items-center space-x-3">
-            <StorageMonitor onOpenBackupCenter={() => setIsBackupModalOpen(true)} />
-            <span className="text-slate-300 hidden md:inline">•</span>
-            <button
-              onClick={handleLockWorkstation}
-              className="text-slate-500 hover:text-slate-900 transition-colors font-semibold hidden md:inline"
-              title="Lock Operatory Workstation"
-            >
-              Lock Terminal (PIN: 1234)
-            </button>
-          </div>
-        </footer>
+          {/* Clinic Status & Storage Telemetry Footer */}
+          <footer className="h-7 bg-white border-t border-border px-4 flex items-center justify-between text-[11px] text-slate-500 z-10 flex-shrink-0 select-none">
+            <div className="flex items-center space-x-3">
+              <span className="font-bold text-slate-700">Dentrix Clinical OS</span>
+              <span className="text-slate-300">•</span>
+              <span className="font-medium text-slate-600">{currentTenant?.name || 'Apex Dental'}</span>
+              <span className="text-slate-300">•</span>
+              <span className="hidden sm:inline text-emerald-700 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                IndexedDB Mirror Active
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <StorageMonitor onOpenBackupCenter={() => setIsBackupModalOpen(true)} />
+              <span className="text-slate-300 hidden md:inline">•</span>
+              <button
+                onClick={handleLockWorkstation}
+                className="text-slate-500 hover:text-slate-900 transition-colors font-semibold hidden md:inline"
+                title="Lock Operatory Workstation"
+              >
+                Lock Terminal (PIN: 1234)
+              </button>
+            </div>
+          </footer>
+        </div>
+
+        {/* Global Modals */}
+        <SignInModal
+          isOpen={isSignInOpen}
+          onClose={() => setIsSignInOpen(false)}
+          onSuccess={() => setIsSignInOpen(false)}
+        />
+        <BookAppointmentModal
+          isOpen={isBookModalOpen}
+          onClose={() => {
+            setIsBookModalOpen(false);
+            setBookModalPatientId(undefined);
+          }}
+          initialPatientId={bookModalPatientId}
+        />
+
+        <AddPatientModal
+          isOpen={isAddPatientOpen}
+          onClose={() => setIsAddPatientOpen(false)}
+        />
+
+        <AddServiceModal
+          isOpen={isAddServiceOpen}
+          onClose={() => setIsAddServiceOpen(false)}
+        />
+
+        <AddStaffModal
+          isOpen={isAddStaffOpen}
+          onClose={() => setIsAddStaffOpen(false)}
+        />
+
+        <OnboardTenantModal
+          isOpen={isOnboardTenantOpen}
+          onClose={() => setIsOnboardTenantOpen(false)}
+        />
+
+        <CreateInvoiceModal
+          isOpen={isCreateInvoiceOpen}
+          onClose={() => {
+            setIsCreateInvoiceOpen(false);
+            setCreateInvoicePatientId(undefined);
+          }}
+          initialPatientId={createInvoicePatientId}
+          onInvoiceCreated={(invoice) => {
+            setCreatedInvoiceForPrint(invoice);
+          }}
+        />
+
+        <InvoicePrintModal
+          isOpen={!!createdInvoiceForPrint}
+          onClose={() => setCreatedInvoiceForPrint(null)}
+          invoice={createdInvoiceForPrint}
+        />
+
+        {/* Clinic Statutory Data Backup & Disaster Recovery Modal */}
+        <ClinicBackupModal
+          isOpen={isBackupModalOpen}
+          onClose={() => setIsBackupModalOpen(false)}
+        />
+
+        {/* Operatory Privacy Screen Auto / Manual Lock Overlay */}
+        <PrivacyLockScreen
+          isOpen={isWorkstationLocked}
+          onUnlock={handleUnlockWorkstation}
+        />
       </div>
-
-      {/* Global Modals */}
-      <SignInModal
-        isOpen={isSignInOpen}
-        onClose={() => setIsSignInOpen(false)}
-        onSuccess={() => setIsSignInOpen(false)}
-      />
-      <BookAppointmentModal
-        isOpen={isBookModalOpen}
-        onClose={() => {
-          setIsBookModalOpen(false);
-          setBookModalPatientId(undefined);
-        }}
-        initialPatientId={bookModalPatientId}
-      />
-
-      <AddPatientModal
-        isOpen={isAddPatientOpen}
-        onClose={() => setIsAddPatientOpen(false)}
-      />
-
-      <AddServiceModal
-        isOpen={isAddServiceOpen}
-        onClose={() => setIsAddServiceOpen(false)}
-      />
-
-      <AddStaffModal
-        isOpen={isAddStaffOpen}
-        onClose={() => setIsAddStaffOpen(false)}
-      />
-
-      <OnboardTenantModal
-        isOpen={isOnboardTenantOpen}
-        onClose={() => setIsOnboardTenantOpen(false)}
-      />
-
-      <CreateInvoiceModal
-        isOpen={isCreateInvoiceOpen}
-        onClose={() => {
-          setIsCreateInvoiceOpen(false);
-          setCreateInvoicePatientId(undefined);
-        }}
-        initialPatientId={createInvoicePatientId}
-        onInvoiceCreated={(invoice) => {
-          setCreatedInvoiceForPrint(invoice);
-        }}
-      />
-
-      <InvoicePrintModal
-        isOpen={!!createdInvoiceForPrint}
-        onClose={() => setCreatedInvoiceForPrint(null)}
-        invoice={createdInvoiceForPrint}
-      />
-
-      {/* Clinic Statutory Data Backup & Disaster Recovery Modal */}
-      <ClinicBackupModal
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
-      />
-
-      {/* Operatory Privacy Screen Auto / Manual Lock Overlay */}
-      <PrivacyLockScreen
-        isOpen={isWorkstationLocked}
-        onUnlock={handleUnlockWorkstation}
-      />
-    </div>
+    </DataProvider>
   );
 };
 
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <DataProvider>
-        <AppContent />
-      </DataProvider>
+      <AppContent />
     </AuthProvider>
   );
 };

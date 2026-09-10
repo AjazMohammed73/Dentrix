@@ -15,6 +15,7 @@ import {
 import { Tooth3D } from './Tooth3D';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { todayISO } from '../../utils/format';
 
 export type NavRoute =
   | 'dashboard'
@@ -42,7 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSi
   const canManageStaff = currentUser.permissions.canManageStaff || isDoctor || isSuperAdmin;
   const canManageServices = currentUser.permissions.canManageServices || isDoctor || isSuperAdmin;
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayISO();
   const todayAptCount = appointments.filter((a) => a.date === todayStr).length;
 
   const navItems = [

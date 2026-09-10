@@ -34,7 +34,8 @@ import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { InvoiceStatus, Invoice, PaymentInstallment, ClinicTenant, TenantSubscription } from '../types';
-import { formatINR } from '../utils/format';
+import { formatINR, todayISO } from '../utils/format';
+import { toCsv, downloadCsv } from '../utils/csv';
 import { AccessDeniedView } from './AccessDeniedView';
 import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
 import { InvoicePrintModal } from '../components/modals/InvoicePrintModal';
@@ -113,7 +114,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Daily calculations
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayISO();
   const todaysAppointments = appointments.filter((a) => a.date === todayStr);
   const totalBilledToday = todaysAppointments.reduce((sum, a) => sum + a.fee, 0);
 
@@ -163,25 +164,20 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
   });
 
   const exportCSV = () => {
-    const headers = ['Invoice Number', 'Patient', 'Service', 'Amount', 'Amount Paid', 'Balance', 'Date', 'Status'];
-    const rows = filteredInvoices.map((i) => [
-      i.invoiceNumber,
-      `"${i.patientName}"`,
-      `"${i.serviceName}"`,
-      i.amount,
-      i.amountPaid,
-      i.balance,
-      i.date,
-      i.status,
+    const csv = toCsv([
+      ['Invoice Number', 'Patient', 'Service', 'Amount', 'Amount Paid', 'Balance', 'Date', 'Status'],
+      ...filteredInvoices.map((i) => [
+        i.invoiceNumber,
+        i.patientName,
+        i.serviceName,
+        i.amount,
+        i.amountPaid,
+        i.balance,
+        i.date,
+        i.status,
+      ]),
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Dentrix_Revenue_${currentTenant?.slug || 'clinic'}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(`Dentrix_Revenue_${currentTenant?.slug || 'clinic'}.csv`, csv);
   };
 
   // Insurance Claims Calculations & Filtering
@@ -1153,7 +1149,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                             `*Balance Due:* ${formatINR(inv.balance)}\n` +
                             `*Status:* ${inv.status.toUpperCase()}\n` +
                             `Thank you! • _Powered by Axiotronicx.Inc_`;
-                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
                         }}
                         className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                         title="Share via WhatsApp"

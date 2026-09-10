@@ -23,7 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { NavRoute } from '../components/layout/Sidebar';
 import { AppointmentStatus, Appointment } from '../types';
-import { formatINR } from '../utils/format';
+import { formatINR, todayISO } from '../utils/format';
 import { AppointmentReminderModal } from '../components/modals/AppointmentReminderModal';
 
 interface DashboardViewProps {
@@ -53,7 +53,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
   const canViewRevenue = currentUser.permissions.canViewRevenue || isSuperAdmin;
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayISO();
   const todaysAppointments = appointments.filter((a) => a.date === todayStr);
 
   // Financial calculations

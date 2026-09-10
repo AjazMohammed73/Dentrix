@@ -3,7 +3,7 @@ import { X, FileText, User, DollarSign, Calendar, CreditCard, Sparkles, Percent,
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { InvoiceStatus, Invoice } from '../../types';
-import { formatINR } from '../../utils/format';
+import { formatINR, todayISO, isoAfterDays } from '../../utils/format';
 
 interface CreateInvoiceModalProps {
   isOpen: boolean;
@@ -33,12 +33,8 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const [applyGst, setApplyGst] = useState<boolean>(false);
 
   const [amountPaid, setAmountPaid] = useState<number>(0);
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [dueDate, setDueDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 15);
-    return d.toISOString().split('T')[0];
-  });
+  const [date, setDate] = useState(todayISO);
+  const [dueDate, setDueDate] = useState(() => isoAfterDays(15));
   const [status, setStatus] = useState<InvoiceStatus>('Pending');
   const [paymentMethod, setPaymentMethod] = useState<Invoice['paymentMethod']>('UPI / Bank');
 
@@ -81,38 +77,42 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatient) return;
 
-    const invoiceNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    try {
+      // invoiceNumber / patientName / balance are set server-side; kept here to
+      // satisfy the Invoice shape.
+      const newInvoice = await addInvoice({
+        invoiceNumber: '',
+        patientId: selectedPatient.id,
+        patientName: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
+        serviceName,
+        amount: finalAmount,
+        amountPaid: Number(amountPaid),
+        balance: Math.max(0, finalAmount - Number(amountPaid)),
+        date,
+        dueDate,
+        status: Number(amountPaid) >= finalAmount ? 'Paid' : status,
+        paymentMethod: Number(amountPaid) > 0 ? paymentMethod : undefined,
+        subtotal,
+        discountType: discountValue > 0 ? discountType : undefined,
+        discountValue: discountValue > 0 ? discountValue : undefined,
+        discountAmount: discountValue > 0 ? discountAmount : undefined,
+        taxRatePercent: applyGst ? 18 : undefined,
+        taxAmount: applyGst ? taxAmount : undefined,
+        cgstAmount: applyGst ? cgstAmount : undefined,
+        sgstAmount: applyGst ? sgstAmount : undefined,
+      });
 
-    const newInvoice = addInvoice({
-      invoiceNumber: invoiceNum,
-      patientId: selectedPatient.id,
-      patientName: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
-      serviceName,
-      amount: finalAmount,
-      amountPaid: Number(amountPaid),
-      balance: Math.max(0, finalAmount - Number(amountPaid)),
-      date,
-      dueDate,
-      status: Number(amountPaid) >= finalAmount ? 'Paid' : status,
-      paymentMethod: Number(amountPaid) > 0 ? paymentMethod : undefined,
-      subtotal,
-      discountType: discountValue > 0 ? discountType : undefined,
-      discountValue: discountValue > 0 ? discountValue : undefined,
-      discountAmount: discountValue > 0 ? discountAmount : undefined,
-      taxRatePercent: applyGst ? 18 : undefined,
-      taxAmount: applyGst ? taxAmount : undefined,
-      cgstAmount: applyGst ? cgstAmount : undefined,
-      sgstAmount: applyGst ? sgstAmount : undefined,
-    });
-
-    if (onInvoiceCreated) {
-      onInvoiceCreated(newInvoice);
+      if (onInvoiceCreated) {
+        onInvoiceCreated(newInvoice);
+      }
+      onClose();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Failed to create invoice');
     }
-    onClose();
   };
 
   return (

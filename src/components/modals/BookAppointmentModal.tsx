@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Calendar, Clock, User, Stethoscope, Armchair, DollarSign, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { OperatoryChair } from '../../types';
-import { formatINR } from '../../utils/format';
+import { formatINR, todayISO } from '../../utils/format';
 
 interface BookAppointmentModalProps {
   isOpen: boolean;
@@ -21,24 +21,49 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const { patients, services, addAppointment, checkAppointmentConflict, operatoryChairs } = useData();
   const { allUsers, currentTenant } = useAuth();
 
-  const activeChairs = operatoryChairs.filter((c) => c.isActive);
-
-  const doctors = allUsers.filter(
-    (u) =>
-      (u.role === 'DOCTOR_ADMIN' || u.title.toLowerCase().includes('hygienist') || u.title.toLowerCase().includes('surgeon') || u.title.toLowerCase().includes('doctor')) &&
-      (!u.tenantId || u.tenantId === currentTenant?.id)
+  const activeChairs = useMemo(
+    () => (operatoryChairs || []).filter((c) => c.isActive),
+    [operatoryChairs],
   );
 
-  const [patientId, setPatientId] = useState(initialPatientId || (patients[0]?.id || ''));
-  const [serviceId, setServiceId] = useState(services[0]?.id || '');
-  const [doctorId, setDoctorId] = useState(doctors[0]?.id || '');
-  const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
+  const doctors = useMemo(
+    () =>
+      allUsers.filter(
+        (u) =>
+          (u.role === 'DOCTOR_ADMIN' ||
+            u.title.toLowerCase().includes('hygienist') ||
+            u.title.toLowerCase().includes('surgeon') ||
+            u.title.toLowerCase().includes('doctor')) &&
+          (!u.tenantId || u.tenantId === currentTenant?.id),
+      ),
+    [allUsers, currentTenant?.id],
+  );
+
+  const [patientId, setPatientId] = useState('');
+  const [serviceId, setServiceId] = useState('');
+  const [doctorId, setDoctorId] = useState('');
+  const [date, setDate] = useState(initialDate || todayISO());
   const [startTime, setStartTime] = useState('10:00');
   const [operatoryChair, setOperatoryChair] = useState<string>(
     activeChairs[0]?.name || 'Chair 1 - Hygiene'
   );
   const [notes, setNotes] = useState('');
   const [allowOverride, setAllowOverride] = useState(false);
+
+  // Fill the dropdowns once the (async) lists arrive; re-target the patient when the
+  // modal is opened for a specific one.
+  useEffect(() => {
+    if (isOpen && initialPatientId) setPatientId(initialPatientId);
+  }, [isOpen, initialPatientId]);
+  useEffect(() => {
+    setPatientId((cur) => cur || patients[0]?.id || '');
+  }, [patients]);
+  useEffect(() => {
+    setServiceId((cur) => cur || services[0]?.id || '');
+  }, [services]);
+  useEffect(() => {
+    setDoctorId((cur) => cur || doctors[0]?.id || '');
+  }, [doctors]);
 
   if (!isOpen) return null;
 
@@ -62,31 +87,23 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
     selectedDoctor?.id || 'doc_1'
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient || !selectedService) return;
+    if (!selectedPatient || !selectedService || !selectedDoctor) return;
 
     if (conflictInfo.hasConflict && !allowOverride) {
       return;
     }
 
-    addAppointment({
+    await addAppointment({
       patientId: selectedPatient.id,
-      patientName: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
-      patientPhone: selectedPatient.phone,
-      doctorId: selectedDoctor ? selectedDoctor.id : 'doc_1',
-      doctorName: selectedDoctor ? selectedDoctor.name : 'Dr. Sarah Vance, DDS',
       serviceId: selectedService.id,
-      serviceName: selectedService.name,
-      procedureCode: selectedService.code,
+      doctorId: selectedDoctor.id,
       date,
       startTime,
-      endTime: prospectiveEndTime,
-      durationMinutes: selectedService.durationMinutes,
       operatoryChair,
-      status: 'Scheduled',
-      notes: allowOverride ? `[OVERRIDE APPROVED] ${notes}` : notes,
-      fee: selectedService.basePrice,
+      notes,
+      allowOverride,
     });
 
     onClose();

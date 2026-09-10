@@ -1,14 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
-  Patient,
   Appointment,
-  DentalService,
-  ClinicalNote,
-  Invoice,
-  SystemHealth,
   AppointmentStatus,
   AuditAction,
   AuditLogEntry,
+  ClinicalNote,
+  DentalService,
+  Invoice,
+  Patient,
   PaymentInstallment,
   DentalPrescription,
   DentalRadiograph,
@@ -17,83 +16,103 @@ import {
   TreatmentPlanItem,
   OperatoryChairConfig,
   OperatoryChairType,
+  SystemHealth,
 } from '../types';
 import {
-  initialPatients,
-  initialServices,
-  initialClinicalNotes,
-  getInitialAppointments,
-  initialInvoices,
-  initialSystemHealth,
   initialPrescriptions,
   initialRadiographs,
   initialPerioCharts,
   initialTreatmentPlans,
   initialOperatoryChairs,
 } from '../data/mockData';
+import { ApiError, api } from '../lib/api';
 import { useAuth } from './AuthContext';
 import { safeStorageSet } from '../utils/storage';
 
+// Decorative infra telemetry — there is no `/system-health` endpoint (see CONTEXT.md).
+const STATIC_SYSTEM_HEALTH: SystemHealth = {
+  databasePools: { active: 14, idle: 36, max: 100 },
+  storageUsedGb: 28.4,
+  storageTotalGb: 250,
+  uptimePercent: 99.98,
+  activeTenantsCount: 2,
+  totalAppointmentsToday: 0,
+};
+
+interface BookAppointmentInput {
+  patientId: string;
+  serviceId: string;
+  doctorId: string;
+  date: string;
+  startTime: string;
+  operatoryChair: string;
+  notes?: string;
+  allowOverride?: boolean;
+}
+
+interface InvoiceInput {
+  patientId: string;
+  serviceName: string;
+  amount: number;
+  amountPaid: number;
+  date: string;
+  dueDate: string;
+  status: Invoice['status'];
+  paymentMethod?: Invoice['paymentMethod'];
+}
+
 interface DataContextType {
-  // Scoped lists
   patients: Patient[];
   appointments: Appointment[];
   services: DentalService[];
+  allServices: DentalService[];
   clinicalNotes: ClinicalNote[];
   invoices: Invoice[];
-  systemHealth: SystemHealth;
   auditLogs: AuditLogEntry[];
+  systemHealth: SystemHealth;
+  loading: boolean;
+  refreshAll: () => Promise<void>;
+
   prescriptions: DentalPrescription[];
   radiographs: DentalRadiograph[];
   perioCharts: PeriodontalChart[];
   treatmentPlans: PatientTreatmentPlan[];
   operatoryChairs: OperatoryChairConfig[];
 
-  // Global lists (for Super Admin)
+  // Global lists (for Super Admin / Backups)
   allPatients: Patient[];
   allAppointments: Appointment[];
   allInvoices: Invoice[];
+  allClinicalNotes: ClinicalNote[];
   allOperatoryChairs: OperatoryChairConfig[];
-  allServices: DentalService[];
   allPrescriptions: DentalPrescription[];
   allRadiographs: DentalRadiograph[];
   allPerioCharts: PeriodontalChart[];
   allTreatmentPlans: PatientTreatmentPlan[];
 
-  // Mutations
-  addPatient: (patientData: Omit<Patient, 'id' | 'createdAt' | 'tenantId'>) => Patient;
-  updatePatient: (patient: Patient) => void;
-  addAppointment: (appointmentData: Omit<Appointment, 'id' | 'tenantId'>) => Appointment;
-  updateAppointmentStatus: (id: string, status: AppointmentStatus) => void;
-  deleteAppointment: (id: string) => void;
-  addClinicalNote: (noteData: Omit<ClinicalNote, 'id' | 'tenantId' | 'signedAt'>) => ClinicalNote;
-  addService: (serviceData: Omit<DentalService, 'id' | 'tenantId'>) => DentalService;
-  updateService: (service: DentalService) => void;
-  toggleServiceActive: (id: string) => void;
-  addInvoice: (invoiceData: Omit<Invoice, 'id' | 'tenantId'>) => Invoice;
+  addPatient: (data: Omit<Patient, 'id' | 'createdAt' | 'tenantId'>) => Promise<void>;
+  updatePatient: (patient: Patient) => Promise<void>;
+  addAppointment: (data: BookAppointmentInput) => Promise<void>;
+  updateAppointmentStatus: (id: string, status: AppointmentStatus) => Promise<void>;
+  deleteAppointment: (id: string) => Promise<void>;
+  addClinicalNote: (data: Omit<ClinicalNote, 'id' | 'tenantId' | 'signedAt'>) => Promise<void>;
+  addService: (data: Omit<DentalService, 'id' | 'tenantId'>) => Promise<void>;
+  updateService: (service: DentalService) => Promise<void>;
+  toggleServiceActive: (id: string) => Promise<void>;
+  addInvoice: (data: Omit<Invoice, 'id' | 'tenantId'>) => Promise<Invoice>;
   addInvoicePayment: (
     invoiceId: string,
-    payment: {
-      amount: number;
-      method: PaymentInstallment['method'];
-      notes?: string;
-    }
-  ) => void;
-  markInvoicePaid: (id: string, paymentMethod?: Invoice['paymentMethod']) => void;
-  deleteInvoice: (id: string) => void;
-  logAuditEvent: (
-    action: AuditAction,
-    resourceType: AuditLogEntry['resourceType'],
-    resourceId?: string,
-    details?: string
-  ) => void;
+    payment: { amount: number; method: PaymentInstallment['method']; notes?: string },
+  ) => Promise<void>;
+  markInvoicePaid: (id: string, paymentMethod?: Invoice['paymentMethod']) => Promise<void>;
+  deleteInvoice: (id: string) => Promise<void>;
   checkAppointmentConflict: (
     date: string,
     startTime: string,
     endTime: string,
     operatoryChair: string,
     doctorId: string,
-    excludeAppointmentId?: string
+    excludeAppointmentId?: string,
   ) => {
     hasConflict: boolean;
     chairConflict?: Appointment;
@@ -111,7 +130,7 @@ interface DataContextType {
     planId: string,
     phaseId: string,
     itemId: string,
-    status: TreatmentPlanItem['status']
+    status: TreatmentPlanItem['status'],
   ) => void;
   acceptTreatmentPlan: (planId: string) => void;
 
@@ -119,7 +138,7 @@ interface DataContextType {
   addOperatoryChair: (
     name: string,
     chairType: OperatoryChairType,
-    roomNumber?: string
+    roomNumber?: string,
   ) => { success: boolean; message?: string; chair?: OperatoryChairConfig };
   updateOperatoryChair: (id: string, updates: Partial<OperatoryChairConfig>) => void;
   deleteOperatoryChair: (id: string) => { success: boolean; message?: string };
@@ -129,77 +148,55 @@ interface DataContextType {
   // Insurance Claims & Data Backup
   updateInvoiceInsuranceClaim: (
     invoiceId: string,
-    claimData: Partial<NonNullable<Invoice['insuranceClaim']>>
+    claimData: Partial<NonNullable<Invoice['insuranceClaim']>>,
   ) => void;
   restoreBackupData: (backupData: any) => { success: boolean; message?: string };
+  logAuditEvent: (
+    action: AuditAction,
+    resourceType: AuditLogEntry['resourceType'],
+    resourceId?: string,
+    details?: string,
+  ) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+const safeList = async <T,>(path: string): Promise<T[]> => {
+  try {
+    return await api<T[]>(path);
+  } catch (e) {
+    // 403 => this role legitimately can't see this list; treat as empty.
+    // Anything else (5xx, network, CORS) is a real failure — surface it.
+    if (e instanceof ApiError && e.status === 403) return [];
+    throw e;
+  }
+};
+
+const toMinutes = (t: string): number => {
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, currentTenant } = useAuth();
-  const currentTenantId = currentTenant?.id || 'tenant_apex';
+  const currentTenantId = currentTenant?.id || currentUser?.tenantId || 'tenant_apex';
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
-  const [allPatients, setAllPatients] = useState<Patient[]>(() => {
-    const saved = localStorage.getItem('dentrix_patients');
-    return saved ? JSON.parse(saved) : initialPatients;
-  });
+  const canRevenue =
+    currentUser?.role === 'SUPER_ADMIN' ||
+    currentUser?.role === 'DOCTOR_ADMIN' ||
+    currentUser?.permissions?.canViewRevenue;
+  const canAudit = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'DOCTOR_ADMIN';
 
-  const [allAppointments, setAllAppointments] = useState<Appointment[]>(() => {
-    const saved = localStorage.getItem('dentrix_appointments');
-    return saved ? JSON.parse(saved) : getInitialAppointments();
-  });
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [services, setServices] = useState<DentalService[]>([]);
+  const [clinicalNotes, setClinicalNotes] = useState<ClinicalNote[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [allServices, setAllServices] = useState<DentalService[]>(() => {
-    const saved = localStorage.getItem('dentrix_services');
-    return saved ? JSON.parse(saved) : initialServices;
-  });
-
-  const [allClinicalNotes, setAllClinicalNotes] = useState<ClinicalNote[]>(() => {
-    const saved = localStorage.getItem('dentrix_clinical_notes');
-    return saved ? JSON.parse(saved) : initialClinicalNotes;
-  });
-
-  const [allInvoices, setAllInvoices] = useState<Invoice[]>(() => {
-    const saved = localStorage.getItem('dentrix_invoices');
-    return saved ? JSON.parse(saved) : initialInvoices;
-  });
-
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
-    const saved = localStorage.getItem('dentrix_audit_logs');
-    if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'audit_init_1',
-        tenantId: 'tenant_apex',
-        timestamp: new Date(Date.now() - 3600000).toISOString().replace('T', ' ').substring(0, 19),
-        userId: 'user_apex_doctor',
-        userName: 'Dr. Sarah Vance, DDS',
-        userRole: 'DOCTOR_ADMIN',
-        action: 'SECURITY_LOGIN',
-        resourceType: 'Security',
-        details: 'Verified clinic access with SHA-256 license credential.',
-      },
-      {
-        id: 'audit_init_2',
-        tenantId: 'tenant_apex',
-        timestamp: new Date(Date.now() - 1800000).toISOString().replace('T', ' ').substring(0, 19),
-        userId: 'user_apex_doctor',
-        userName: 'Dr. Sarah Vance, DDS',
-        userRole: 'DOCTOR_ADMIN',
-        action: 'PATIENT_VIEWED',
-        resourceType: 'Patient',
-        resourceId: 'pat_1',
-        details: 'Accessed electronic health record and odontogram for Eleanor Vance.',
-      },
-    ];
-  });
-
-  const [systemHealth, setSystemHealth] = useState<SystemHealth>(() => {
-    const saved = localStorage.getItem('dentrix_system_health');
-    return saved ? JSON.parse(saved) : initialSystemHealth;
-  });
-
+  // Local/persisted states for clinical suite & chair config
   const [allPrescriptions, setAllPrescriptions] = useState<DentalPrescription[]>(() => {
     const saved = localStorage.getItem('dentrix_prescriptions');
     return saved ? JSON.parse(saved) : initialPrescriptions;
@@ -225,35 +222,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : initialOperatoryChairs;
   });
 
-  // Sync to LocalStorage & IndexedDB
-  useEffect(() => {
-    safeStorageSet('dentrix_patients', allPatients, 'patients');
-  }, [allPatients]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_appointments', allAppointments, 'appointments');
-  }, [allAppointments]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_services', allServices);
-  }, [allServices]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_clinical_notes', allClinicalNotes, 'clinical_notes');
-  }, [allClinicalNotes]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_invoices', allInvoices, 'invoices');
-  }, [allInvoices]);
-
-  useEffect(() => {
-    safeStorageSet('dentrix_audit_logs', auditLogs, 'audit_logs');
-  }, [auditLogs]);
-
-  useEffect(() => {
-    localStorage.setItem('dentrix_system_health', JSON.stringify(systemHealth));
-  }, [systemHealth]);
-
+  // Sync to local storage
   useEffect(() => {
     safeStorageSet('dentrix_prescriptions', allPrescriptions, 'prescriptions');
   }, [allPrescriptions]);
@@ -274,29 +243,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeStorageSet('dentrix_operatory_chairs', allOperatoryChairs, 'operatory_chairs');
   }, [allOperatoryChairs]);
 
-  // Logical Partitioning / Scoping by Tenant
-  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
-
-  const patients = isSuperAdmin
-    ? allPatients
-    : allPatients.filter((p) => p.tenantId === currentTenantId);
-
-  const appointments = isSuperAdmin
-    ? allAppointments
-    : allAppointments.filter((a) => a.tenantId === currentTenantId);
-
-  const services = isSuperAdmin
-    ? allServices
-    : allServices.filter((s) => s.tenantId === currentTenantId);
-
-  const clinicalNotes = isSuperAdmin
-    ? allClinicalNotes
-    : allClinicalNotes.filter((c) => c.tenantId === currentTenantId);
-
-  const invoices = isSuperAdmin
-    ? allInvoices
-    : allInvoices.filter((i) => i.tenantId === currentTenantId);
-
+  // Scoped views
   const prescriptions = isSuperAdmin
     ? allPrescriptions
     : allPrescriptions.filter((p) => p.tenantId === currentTenantId);
@@ -317,107 +264,207 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ? allOperatoryChairs
     : allOperatoryChairs.filter((oc) => oc.tenantId === currentTenantId);
 
-  // Actions
-  const addPatient = (patientData: Omit<Patient, 'id' | 'createdAt' | 'tenantId'>): Patient => {
-    const newPatient: Patient = {
-      ...patientData,
-      id: `pat_${Date.now()}`,
+  // Loaders
+  const loadPatients = useCallback(() => safeList<Patient>('/patients').then(setPatients), []);
+  const loadServices = useCallback(() => safeList<DentalService>('/services').then(setServices), []);
+  const loadAppointments = useCallback(
+    () => safeList<Appointment>('/appointments').then(setAppointments),
+    [],
+  );
+  const loadNotes = useCallback(
+    () => safeList<ClinicalNote>('/clinical-notes').then(setClinicalNotes),
+    [],
+  );
+  const loadInvoices = useCallback(
+    () => (canRevenue ? safeList<Invoice>('/invoices') : Promise.resolve([])).then(setInvoices),
+    [canRevenue],
+  );
+  const loadAudit = useCallback(
+    () => (canAudit ? safeList<AuditLogEntry>('/audit-logs') : Promise.resolve([])).then(setAuditLogs),
+    [canAudit],
+  );
+
+  const refreshAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadPatients(),
+        loadServices(),
+        loadAppointments(),
+        loadNotes(),
+        loadInvoices(),
+        loadAudit(),
+      ]);
+    } catch (e) {
+      window.alert(
+        e instanceof Error
+          ? `Couldn't load clinic data: ${e.message}. Check your connection and reload.`
+          : "Couldn't load clinic data. Check your connection and reload.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [loadPatients, loadServices, loadAppointments, loadNotes, loadInvoices, loadAudit]);
+
+  useEffect(() => {
+    void refreshAll();
+  }, [refreshAll]);
+
+  const guard = async (fn: () => Promise<void>): Promise<void> => {
+    try {
+      await fn();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Request failed');
+    }
+  };
+
+  const logAuditEvent = (
+    action: AuditAction,
+    resourceType: AuditLogEntry['resourceType'],
+    resourceId?: string,
+    details?: string,
+  ) => {
+    const entry: AuditLogEntry = {
+      id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       tenantId: currentTenantId,
-      createdAt: new Date().toISOString().split('T')[0],
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      userId: currentUser?.id || null,
+      userName: currentUser?.name || 'System',
+      userRole: currentUser?.role || '',
+      action,
+      resourceType,
+      resourceId,
+      details: details || '',
     };
-    setAllPatients((prev) => [newPatient, ...prev]);
-    logAuditEvent('PATIENT_CREATED', 'Patient', newPatient.id, `Created electronic profile for ${newPatient.firstName} ${newPatient.lastName}`);
-    return newPatient;
+    setAuditLogs((prev) => [entry, ...prev]);
   };
 
-  const updatePatient = (updated: Patient) => {
-    setAllPatients((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    logAuditEvent('PATIENT_UPDATED', 'Patient', updated.id, `Updated electronic health record for ${updated.firstName} ${updated.lastName}`);
-  };
+  // --- patients ---
+  const addPatient = (data: Omit<Patient, 'id' | 'createdAt' | 'tenantId'>) =>
+    guard(async () => {
+      await api('/patients', { method: 'POST', body: data });
+      await loadPatients();
+    });
 
-  const addAppointment = (
-    appointmentData: Omit<Appointment, 'id' | 'tenantId'>
-  ): Appointment => {
-    const newAppointment: Appointment = {
-      ...appointmentData,
-      id: `apt_${Date.now()}`,
-      tenantId: currentTenantId,
+  const updatePatient = (patient: Patient) =>
+    guard(async () => {
+      const { id, tenantId, createdAt, ...rest } = patient;
+      void tenantId;
+      void createdAt;
+      await api(`/patients/${id}`, { method: 'PATCH', body: rest });
+      await loadPatients();
+    });
+
+  // --- appointments ---
+  const addAppointment = (data: BookAppointmentInput) =>
+    guard(async () => {
+      await api('/appointments', {
+        method: 'POST',
+        body: {
+          patientId: data.patientId,
+          serviceId: data.serviceId,
+          doctorId: data.doctorId,
+          date: data.date,
+          startTime: data.startTime,
+          operatoryChair: data.operatoryChair,
+          notes: data.notes ?? '',
+          allowOverride: data.allowOverride ?? false,
+        },
+      });
+      await Promise.all([loadAppointments(), loadInvoices(), loadPatients()]);
+    });
+
+  const updateAppointmentStatus = (id: string, status: AppointmentStatus) =>
+    guard(async () => {
+      await api(`/appointments/${id}`, { method: 'PATCH', body: { status } });
+      await Promise.all([loadAppointments(), loadInvoices(), loadPatients()]);
+    });
+
+  const deleteAppointment = (id: string) =>
+    guard(async () => {
+      await api(`/appointments/${id}`, { method: 'DELETE' });
+      await Promise.all([loadAppointments(), loadInvoices(), loadPatients()]);
+    });
+
+  // --- clinical notes ---
+  const addClinicalNote = (data: Omit<ClinicalNote, 'id' | 'tenantId' | 'signedAt'>) =>
+    guard(async () => {
+      await api('/clinical-notes', { method: 'POST', body: data });
+      await loadNotes();
+    });
+
+  // --- services ---
+  const addService = (data: Omit<DentalService, 'id' | 'tenantId'>) =>
+    guard(async () => {
+      await api('/services', { method: 'POST', body: data });
+      await loadServices();
+    });
+
+  const updateService = (service: DentalService) =>
+    guard(async () => {
+      const { id, tenantId, ...rest } = service;
+      void tenantId;
+      await api(`/services/${id}`, { method: 'PATCH', body: rest });
+      await loadServices();
+    });
+
+  const toggleServiceActive = (id: string) =>
+    guard(async () => {
+      const svc = services.find((s) => s.id === id);
+      await api(`/services/${id}`, {
+        method: 'PATCH',
+        body: { isActive: !(svc?.isActive ?? true) },
+      });
+      await loadServices();
+    });
+
+  // --- invoices ---
+  const addInvoice = async (data: Omit<Invoice, 'id' | 'tenantId'>): Promise<Invoice> => {
+    const payload: InvoiceInput = {
+      patientId: data.patientId,
+      serviceName: data.serviceName,
+      amount: data.amount,
+      amountPaid: data.amountPaid,
+      date: data.date,
+      dueDate: data.dueDate,
+      status: data.status,
+      paymentMethod: data.paymentMethod,
     };
-    setAllAppointments((prev) => [newAppointment, ...prev]);
-
-    // Also auto-generate a pending invoice for this appointment
-    const newInvoice: Invoice = {
-      id: `inv_${Date.now()}`,
-      tenantId: currentTenantId,
-      invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-      patientId: newAppointment.patientId,
-      patientName: newAppointment.patientName,
-      appointmentId: newAppointment.id,
-      serviceName: `${newAppointment.serviceName} (${newAppointment.procedureCode})`,
-      amount: newAppointment.fee,
-      amountPaid: 0,
-      balance: newAppointment.fee,
-      date: newAppointment.date,
-      dueDate: newAppointment.date,
-      status: 'Pending',
-    };
-    setAllInvoices((prev) => [newInvoice, ...prev]);
-
-    logAuditEvent('APPOINTMENT_SCHEDULED', 'Appointment', newAppointment.id, `Booked ${newAppointment.serviceName} on ${newAppointment.date} at ${newAppointment.startTime}`);
-    return newAppointment;
+    const created = await api<Invoice>('/invoices', { method: 'POST', body: payload });
+    await Promise.all([loadInvoices(), loadPatients()]);
+    return created;
   };
 
-  const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
-    setAllAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status } : a))
-    );
-  };
+  const addInvoicePayment = (
+    invoiceId: string,
+    payment: { amount: number; method: PaymentInstallment['method']; notes?: string },
+  ) =>
+    guard(async () => {
+      await api(`/invoices/${invoiceId}/payments`, {
+        method: 'POST',
+        body: {
+          amount: payment.amount,
+          method: payment.method,
+          notes: payment.notes ?? '',
+        },
+      });
+      await Promise.all([loadInvoices(), loadPatients()]);
+    });
 
-  const deleteAppointment = (id: string) => {
-    setAllAppointments((prev) => prev.filter((a) => a.id !== id));
-    logAuditEvent('APPOINTMENT_DELETED', 'Appointment', id, `Appointment cancelled.`);
-  };
+  const markInvoicePaid = (id: string, paymentMethod?: Invoice['paymentMethod']) =>
+    guard(async () => {
+      await api(`/invoices/${id}/mark-paid`, {
+        method: 'POST',
+        body: { paymentMethod },
+      });
+      await Promise.all([loadInvoices(), loadPatients()]);
+    });
 
-  const addClinicalNote = (
-    noteData: Omit<ClinicalNote, 'id' | 'tenantId' | 'signedAt'>
-  ): ClinicalNote => {
-    const newNote: ClinicalNote = {
-      ...noteData,
-      id: `note_${Date.now()}`,
-      tenantId: currentTenantId,
-      signedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-    };
-    setAllClinicalNotes((prev) => [newNote, ...prev]);
-    logAuditEvent(
-      'NOTE_SIGNED',
-      'ClinicalNote',
-      newNote.id,
-      `Clinical Note (${newNote.procedureName}) digitally signed for patient ${newNote.patientId}${newNote.toothNumber ? ` on Tooth #${newNote.toothNumber}` : ''}`
-    );
-    return newNote;
-  };
-
-  const addService = (serviceData: Omit<DentalService, 'id' | 'tenantId'>): DentalService => {
-    const newService: DentalService = {
-      ...serviceData,
-      id: `srv_${Date.now()}`,
-      tenantId: currentTenantId,
-    };
-    setAllServices((prev) => [...prev, newService]);
-    logAuditEvent('SERVICE_CREATED', 'Service', newService.id, `Registered new dental procedure [${newService.code}] ${newService.name} (Fee: ₹${newService.basePrice.toLocaleString()})`);
-    return newService;
-  };
-
-  const updateService = (updated: DentalService) => {
-    setAllServices((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-    logAuditEvent('SERVICE_UPDATED', 'Service', updated.id, `Updated procedure [${updated.code}] ${updated.name} (Fee: ₹${updated.basePrice.toLocaleString()}, Duration: ${updated.durationMinutes}m)`);
-  };
-
-  const toggleServiceActive = (id: string) => {
-    setAllServices((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isActive: !s.isActive } : s))
-    );
-  };
+  const deleteInvoice = (id: string) =>
+    guard(async () => {
+      await api(`/invoices/${id}`, { method: 'DELETE' });
+      await Promise.all([loadInvoices(), loadPatients()]);
+    });
 
   const checkAppointmentConflict = (
     date: string,
@@ -425,44 +472,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     endTime: string,
     operatoryChair: string,
     doctorId: string,
-    excludeAppointmentId?: string
+    excludeAppointmentId?: string,
   ) => {
-    // Convert HH:mm to minutes from midnight
-    const toMins = (t: string) => {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
-    };
-
-    const newStart = toMins(startTime);
-    const newEnd = toMins(endTime);
-
-    const relevantAppointments = allAppointments.filter(
-      (a) =>
-        a.date === date &&
-        a.status !== 'Cancelled' &&
-        a.status !== 'No-Show' &&
-        (!excludeAppointmentId || a.id !== excludeAppointmentId) &&
-        (isSuperAdmin || a.tenantId === currentTenantId)
-    );
-
+    const ns = toMinutes(startTime);
+    const ne = toMinutes(endTime);
     let chairConflict: Appointment | undefined;
     let doctorConflict: Appointment | undefined;
 
-    for (const apt of relevantAppointments) {
-      const aptStart = toMins(apt.startTime);
-      const aptEnd = toMins(apt.endTime);
-
-      // Overlap condition: max(start1, start2) < min(end1, end2)
-      const overlaps = Math.max(newStart, aptStart) < Math.min(newEnd, aptEnd);
-
-      if (overlaps) {
-        if (apt.operatoryChair === operatoryChair && !chairConflict) {
-          chairConflict = apt;
-        }
-        if (apt.doctorId === doctorId && !doctorConflict) {
-          doctorConflict = apt;
-        }
-      }
+    for (const apt of appointments) {
+      if (apt.date !== date) continue;
+      if (apt.status === 'Cancelled' || apt.status === 'No-Show') continue;
+      if (excludeAppointmentId && apt.id === excludeAppointmentId) continue;
+      const overlaps = Math.max(ns, toMinutes(apt.startTime)) < Math.min(ne, toMinutes(apt.endTime));
+      if (!overlaps) continue;
+      if (apt.operatoryChair === operatoryChair && !chairConflict) chairConflict = apt;
+      if (apt.doctorId === doctorId && !doctorConflict) doctorConflict = apt;
     }
 
     return {
@@ -472,197 +496,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  const addInvoice = (invoiceData: Omit<Invoice, 'id' | 'tenantId'>): Invoice => {
-    // Generate initial installment if invoice was created with an immediate payment/deposit
-    const initialInstallments: PaymentInstallment[] =
-      invoiceData.installments && invoiceData.installments.length > 0
-        ? invoiceData.installments
-        : invoiceData.amountPaid > 0
-        ? [
-            {
-              id: `pay_${Date.now()}_init`,
-              amount: invoiceData.amountPaid,
-              date: invoiceData.date || new Date().toISOString().split('T')[0],
-              method: (invoiceData.paymentMethod || 'Cash') as PaymentInstallment['method'],
-              receiptNumber: `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-              notes: 'Initial Payment / Deposit at Invoice Generation',
-              recordedBy: currentUser.name,
-            },
-          ]
-        : [];
-
-    const newInvoice: Invoice = {
-      ...invoiceData,
-      id: `inv_${Date.now()}`,
-      tenantId: currentTenantId,
-      installments: initialInstallments,
-    };
-    setAllInvoices((prev) => [newInvoice, ...prev]);
-
-    // Synchronize Patient Balance: add unpaid balance to patient
-    if (newInvoice.balance > 0) {
-      setAllPatients((prev) =>
-        prev.map((p) =>
-          p.id === newInvoice.patientId
-            ? { ...p, balance: (p.balance || 0) + newInvoice.balance }
-            : p
-        )
-      );
-    }
-
-    logAuditEvent('INVOICE_CREATED', 'Invoice', newInvoice.id, `Generated invoice ${newInvoice.invoiceNumber} for ₹${newInvoice.amount.toLocaleString()} (${newInvoice.patientName})`);
-    return newInvoice;
-  };
-
-  const addInvoicePayment = (
-    invoiceId: string,
-    payment: {
-      amount: number;
-      method: PaymentInstallment['method'];
-      notes?: string;
-    }
-  ) => {
-    let targetPatientId = '';
-    let appliedPayment = 0;
-
-    setAllInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id === invoiceId) {
-          targetPatientId = inv.patientId;
-          const currentPaid = inv.amountPaid || 0;
-          const remainingBalance = Math.max(0, inv.amount - currentPaid);
-
-          // Prevent overpayments: clamp payment to remaining balance
-          appliedPayment = Math.min(Math.max(0, payment.amount), remainingBalance);
-          if (appliedPayment <= 0) return inv;
-
-          const newAmountPaid = currentPaid + appliedPayment;
-          const newBalance = Math.max(0, inv.amount - newAmountPaid);
-          const newInstallment: PaymentInstallment = {
-            id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            amount: appliedPayment,
-            date: new Date().toISOString().split('T')[0],
-            method: payment.method,
-            receiptNumber: `RCP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-            notes: payment.notes,
-            recordedBy: currentUser.name,
-          };
-          const updatedInstallments = [...(inv.installments || []), newInstallment];
-
-          return {
-            ...inv,
-            amountPaid: newAmountPaid,
-            balance: newBalance,
-            status: (newBalance === 0 ? 'Paid' : 'Pending') as Invoice['status'],
-            paymentMethod: payment.method,
-            installments: updatedInstallments,
-          };
-        }
-        return inv;
-      })
-    );
-
-    // Synchronize Patient Balance: reduce balance by actual applied payment
-    if (appliedPayment > 0 && targetPatientId) {
-      setAllPatients((prev) =>
-        prev.map((p) =>
-          p.id === targetPatientId
-            ? { ...p, balance: Math.max(0, (p.balance || 0) - appliedPayment) }
-            : p
-        )
-      );
-    }
-
-    logAuditEvent(
-      'PAYMENT_RECORDED',
-      'Invoice',
-      invoiceId,
-      `Recorded payment installment of ₹${appliedPayment.toLocaleString()} via ${payment.method}`
-    );
-  };
-
-  const markInvoicePaid = (id: string, paymentMethod: Invoice['paymentMethod'] = 'Credit Card') => {
-    let paidAmount = 0;
-    let pId = '';
-
-    setAllInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id === id) {
-          paidAmount = inv.balance;
-          pId = inv.patientId;
-          const newInstallment: PaymentInstallment = {
-            id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            amount: paidAmount,
-            date: new Date().toISOString().split('T')[0],
-            method: paymentMethod || 'Credit Card',
-            notes: 'Full payment balance cleared',
-            recordedBy: currentUser.name,
-          };
-          return {
-            ...inv,
-            amountPaid: inv.amount,
-            balance: 0,
-            status: 'Paid',
-            paymentMethod,
-            installments: [...(inv.installments || []), newInstallment],
-          };
-        }
-        return inv;
-      })
-    );
-
-    // Synchronize Patient Balance: reduce balance by paid amount
-    if (paidAmount > 0 && pId) {
-      setAllPatients((prev) =>
-        prev.map((p) =>
-          p.id === pId ? { ...p, balance: Math.max(0, (p.balance || 0) - paidAmount) } : p
-        )
-      );
-    }
-
-    logAuditEvent('PAYMENT_RECORDED', 'Invoice', id, `Settled invoice fully (₹${paidAmount.toLocaleString()}) via ${paymentMethod}`);
-  };
-
-  const deleteInvoice = (id: string) => {
-    const toDelete = allInvoices.find((i) => i.id === id);
-    setAllInvoices((prev) => prev.filter((inv) => inv.id !== id));
-    logAuditEvent('INVOICE_DELETED', 'Invoice', id, 'Deleted invoice record.');
-
-    // If invoice had an unpaid balance, deduct it from patient's balance
-    if (toDelete && toDelete.balance > 0) {
-      setAllPatients((prev) =>
-        prev.map((p) =>
-          p.id === toDelete.patientId
-            ? { ...p, balance: Math.max(0, (p.balance || 0) - toDelete.balance) }
-            : p
-        )
-      );
-    }
-  };
-
-  const logAuditEvent = (
-    action: AuditAction,
-    resourceType: AuditLogEntry['resourceType'],
-    resourceId?: string,
-    details?: string
-  ) => {
-    const entry: AuditLogEntry = {
-      id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      tenantId: currentTenantId,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userRole: currentUser.role,
-      action,
-      resourceType,
-      resourceId,
-      details: details || '',
-    };
-    setAuditLogs((prev) => [entry, ...prev]);
-  };
-
+  // Clinical Suite Actions
   const addPrescription = (
-    data: Omit<DentalPrescription, 'id' | 'createdAt' | 'tenantId'>
+    data: Omit<DentalPrescription, 'id' | 'createdAt' | 'tenantId'>,
   ): DentalPrescription => {
     const newRx: DentalPrescription = {
       ...data,
@@ -675,7 +511,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'PRESCRIPTION_CREATED',
       'Prescription',
       newRx.id,
-      `Issued e-Rx for ${newRx.patientName} (${newRx.items.length} prescribed items)`
+      `Issued e-Rx for ${newRx.patientName} (${newRx.items.length} prescribed items)`,
     );
     return newRx;
   };
@@ -686,7 +522,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addRadiograph = (
-    data: Omit<DentalRadiograph, 'id' | 'tenantId'>
+    data: Omit<DentalRadiograph, 'id' | 'tenantId'>,
   ): DentalRadiograph => {
     const newRad: DentalRadiograph = {
       ...data,
@@ -698,7 +534,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'RADIOGRAPH_UPLOADED',
       'Radiograph',
       newRad.id,
-      `Uploaded ${newRad.category}: ${newRad.title}`
+      `Uploaded ${newRad.category}: ${newRad.title}`,
     );
     return newRad;
   };
@@ -709,7 +545,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const savePerioChart = (
-    chart: Omit<PeriodontalChart, 'id' | 'tenantId'> & { id?: string }
+    chart: Omit<PeriodontalChart, 'id' | 'tenantId'> & { id?: string },
   ): PeriodontalChart => {
     const chartId = chart.id || `perio_${Date.now()}`;
     const newChart: PeriodontalChart = {
@@ -728,13 +564,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'PERIO_CHART_UPDATED',
       'PerioChart',
       chartId,
-      `Updated periodontal probing exam on ${newChart.examDate}`
+      `Updated periodontal probing exam on ${newChart.examDate}`,
     );
     return newChart;
   };
 
   const addTreatmentPlan = (
-    data: Omit<PatientTreatmentPlan, 'id' | 'tenantId'>
+    data: Omit<PatientTreatmentPlan, 'id' | 'tenantId'>,
   ): PatientTreatmentPlan => {
     const newPlan: PatientTreatmentPlan = {
       ...data,
@@ -746,7 +582,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'TREATMENT_PLAN_CREATED',
       'TreatmentPlan',
       newPlan.id,
-      `Created treatment plan: ${newPlan.title}`
+      `Created treatment plan: ${newPlan.title}`,
     );
     return newPlan;
   };
@@ -755,7 +591,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     planId: string,
     phaseId: string,
     itemId: string,
-    status: TreatmentPlanItem['status']
+    status: TreatmentPlanItem['status'],
   ) => {
     setAllTreatmentPlans((prev) =>
       prev.map((plan) => {
@@ -769,7 +605,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { ...phase, items: updatedItems };
         });
 
-        // Recalculate acceptedFee
         const acceptedFee = updatedPhases.reduce(
           (sum, ph) =>
             sum +
@@ -778,14 +613,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 (it) =>
                   it.status === 'Accepted' ||
                   it.status === 'In-Progress' ||
-                  it.status === 'Completed'
+                  it.status === 'Completed',
               )
               .reduce((s, it) => s + it.estimatedFee, 0),
-          0
+          0,
         );
 
         return { ...plan, phases: updatedPhases, acceptedFee };
-      })
+      }),
     );
     logAuditEvent('TREATMENT_PLAN_UPDATED', 'TreatmentPlan', planId, `Updated procedure status to ${status}`);
   };
@@ -793,76 +628,68 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const acceptTreatmentPlan = (planId: string) => {
     setAllTreatmentPlans((prev) =>
       prev.map((plan) => {
-        if (plan.id !== planId) return plan;
-        const updatedPhases = plan.phases.map((phase) => ({
-          ...phase,
-          items: phase.items.map((it) =>
-            it.status === 'Proposed' ? { ...it, status: 'Accepted' as const } : it
-          ),
-        }));
-        return {
-          ...plan,
-          phases: updatedPhases,
-          status: 'Accepted' as const,
-          patientAcceptedDate: new Date().toISOString().split('T')[0],
-          acceptedFee: plan.totalEstimatedFee,
-        };
-      })
+        if (plan.id === planId) {
+          const updatedPhases = plan.phases.map((ph) => ({
+            ...ph,
+            items: ph.items.map((it) => ({
+              ...it,
+              status: (it.status === 'Proposed' ? 'Accepted' : it.status) as TreatmentPlanItem['status'],
+            })),
+          }));
+          const acceptedFee = updatedPhases.reduce(
+            (sum, ph) =>
+              sum +
+              ph.items
+                .filter((it) => it.status !== 'Declined' && it.status !== 'Proposed')
+                .reduce((s, it) => s + it.estimatedFee, 0),
+            0,
+          );
+          return {
+            ...plan,
+            status: 'Accepted' as const,
+            patientAcceptedDate: new Date().toISOString().split('T')[0],
+            phases: updatedPhases,
+            acceptedFee,
+          };
+        }
+        return plan;
+      }),
     );
-    logAuditEvent('TREATMENT_PLAN_UPDATED', 'TreatmentPlan', planId, 'Patient accepted multi-phase treatment plan');
+    logAuditEvent('TREATMENT_PLAN_UPDATED', 'TreatmentPlan', planId, 'Patient accepted clinical treatment plan');
   };
 
   // Waiting Room Queue Actions
   const markPatientArrived = (appointmentId: string) => {
-    const nowIso = new Date().toISOString();
-    setAllAppointments((prev) =>
-      prev.map((a) => {
-        if (a.id === appointmentId) {
-          logAuditEvent(
-            'PATIENT_CHECKED_IN',
-            'Appointment',
-            appointmentId,
-            `Patient ${a.patientName} arrived at reception for ${a.serviceName} with ${a.doctorName}`
-          );
-          return {
-            ...a,
-            status: 'Arrived' as const,
-            arrivedAt: nowIso,
-          };
-        }
-        return a;
-      })
+    void updateAppointmentStatus(appointmentId, 'Arrived');
+    logAuditEvent(
+      'PATIENT_CHECKED_IN',
+      'Appointment',
+      appointmentId,
+      'Patient arrived at reception and checked in',
     );
   };
 
   const assignChairAndSeat = (appointmentId: string, operatoryChair: string) => {
-    const nowIso = new Date().toISOString();
-    setAllAppointments((prev) =>
-      prev.map((a) => {
-        if (a.id === appointmentId) {
-          logAuditEvent(
-            'PATIENT_SEATED',
-            'Appointment',
-            appointmentId,
-            `Patient ${a.patientName} seated in ${operatoryChair} for ${a.serviceName}`
-          );
-          return {
-            ...a,
-            status: 'In-Chair' as const,
-            operatoryChair,
-            inChairAt: nowIso,
-          };
-        }
-        return a;
-      })
-    );
+    guard(async () => {
+      await api(`/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        body: { status: 'In-Chair' },
+      });
+      await loadAppointments();
+      logAuditEvent(
+        'PATIENT_SEATED',
+        'Appointment',
+        appointmentId,
+        `Patient seated in ${operatoryChair}`,
+      );
+    });
   };
 
   // Operatory Chair Scaling & Configuration
   const addOperatoryChair = (
     name: string,
     chairType: OperatoryChairType,
-    roomNumber?: string
+    roomNumber?: string,
   ): { success: boolean; message?: string; chair?: OperatoryChairConfig } => {
     const currentLimit = currentTenant?.subscription?.chairLimit || 6;
     const activeChairs = operatoryChairs.filter((c) => c.isActive);
@@ -896,7 +723,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'CHAIR_CREATED',
       'Chair',
       newChair.id,
-      `Configured new operatory [${newChair.name}] (${chairType}, ${roomNumber || 'No room'})`
+      `Configured new operatory [${newChair.name}] (${chairType}, ${roomNumber || 'No room'})`,
     );
     return { success: true, chair: newChair };
   };
@@ -910,7 +737,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return updated;
         }
         return c;
-      })
+      }),
     );
   };
 
@@ -919,7 +746,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!chair) return { success: false, message: 'Chair not found.' };
 
     const inChairApt = appointments.find(
-      (a) => a.operatoryChair === chair.name && a.status === 'In-Chair'
+      (a) => a.operatoryChair === chair.name && a.status === 'In-Chair',
     );
     if (inChairApt) {
       return {
@@ -933,120 +760,70 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
-  // Insurance Claims & Backup Restore Actions
+  // Insurance Claims
   const updateInvoiceInsuranceClaim = (
     invoiceId: string,
-    claimData: Partial<NonNullable<Invoice['insuranceClaim']>>
+    claimData: Partial<NonNullable<Invoice['insuranceClaim']>>,
   ) => {
-    setAllInvoices((prev) =>
+    setInvoices((prev) =>
       prev.map((inv) => {
         if (inv.id === invoiceId) {
           const currentClaim = inv.insuranceClaim || {
-            claimId: `CLM-${Date.now().toString().slice(-6)}`,
+            claimId: `clm_${Date.now()}`,
+            claimNumber: `CLM-${Date.now().toString().slice(-6)}`,
+            payerName: 'Primary Insurance',
+            policyNumber: '',
             status: 'Draft' as const,
-            payerName: 'Star Health Insurance',
             claimedAmount: inv.amount,
+            notes: '',
           };
           const updatedClaim = { ...currentClaim, ...claimData };
-
-          if (claimData.status === 'Settled' && claimData.approvedAmount) {
-            logAuditEvent(
-              'CLAIM_SETTLED',
-              'Claim',
-              updatedClaim.claimId,
-              `Insurance claim settled: ₹${claimData.approvedAmount.toLocaleString()} approved by ${updatedClaim.payerName}`
-            );
-          } else if (claimData.status === 'Submitted') {
-            logAuditEvent(
-              'CLAIM_SUBMITTED',
-              'Claim',
-              updatedClaim.claimId,
-              `Submitted claim of ₹${updatedClaim.claimedAmount.toLocaleString()} to ${updatedClaim.payerName}`
-            );
-          }
-
-          return {
-            ...inv,
-            insuranceClaim: updatedClaim,
-          };
+          const updatedInvoice = { ...inv, insuranceClaim: updatedClaim };
+          logAuditEvent(
+            'CLAIM_SUBMITTED',
+            'Claim',
+            invoiceId,
+            `Updated insurance claim for invoice ${inv.invoiceNumber} (${updatedClaim.status})`,
+          );
+          return updatedInvoice;
         }
         return inv;
-      })
+      }),
     );
   };
 
+  // Backup restore
   const restoreBackupData = (backupData: any): { success: boolean; message?: string } => {
     try {
+      if (!backupData || typeof backupData !== 'object') {
+        return { success: false, message: 'Invalid backup file payload format.' };
+      }
       const targetClinicId = currentTenantId;
-      if (!targetClinicId) {
-        return { success: false, message: 'No active clinic selected for restoration.' };
-      }
 
-      // 1. Isolate Patients: Replace only records for this clinic tenant
-      if (backupData.patients && Array.isArray(backupData.patients)) {
-        setAllPatients((prev) => [
-          ...prev.filter((p) => p.tenantId !== targetClinicId),
-          ...backupData.patients.map((p: any) => ({ ...p, tenantId: targetClinicId })),
-        ]);
-      }
-
-      // 2. Isolate Appointments
-      if (backupData.appointments && Array.isArray(backupData.appointments)) {
-        setAllAppointments((prev) => [
-          ...prev.filter((apt) => apt.tenantId !== targetClinicId),
-          ...backupData.appointments.map((apt: any) => ({ ...apt, tenantId: targetClinicId })),
-        ]);
-      }
-
-      // 3. Isolate Clinical Notes
-      if (backupData.clinicalNotes && Array.isArray(backupData.clinicalNotes)) {
-        setAllClinicalNotes((prev) => [
-          ...prev.filter((cn) => cn.tenantId !== targetClinicId),
-          ...backupData.clinicalNotes.map((cn: any) => ({ ...cn, tenantId: targetClinicId })),
-        ]);
-      }
-
-      // 4. Isolate Invoices
-      if (backupData.invoices && Array.isArray(backupData.invoices)) {
-        setAllInvoices((prev) => [
-          ...prev.filter((inv) => inv.tenantId !== targetClinicId),
-          ...backupData.invoices.map((inv: any) => ({ ...inv, tenantId: targetClinicId })),
-        ]);
-      }
-
-      // 5. Isolate Prescriptions
       if (backupData.prescriptions && Array.isArray(backupData.prescriptions)) {
         setAllPrescriptions((prev) => [
-          ...prev.filter((pr) => pr.tenantId !== targetClinicId),
-          ...backupData.prescriptions.map((pr: any) => ({ ...pr, tenantId: targetClinicId })),
+          ...prev.filter((p) => p.tenantId !== targetClinicId),
+          ...backupData.prescriptions.map((p: any) => ({ ...p, tenantId: targetClinicId })),
         ]);
       }
-
-      // 6. Isolate Radiographs
       if (backupData.radiographs && Array.isArray(backupData.radiographs)) {
         setAllRadiographs((prev) => [
-          ...prev.filter((rg) => rg.tenantId !== targetClinicId),
-          ...backupData.radiographs.map((rg: any) => ({ ...rg, tenantId: targetClinicId })),
+          ...prev.filter((r) => r.tenantId !== targetClinicId),
+          ...backupData.radiographs.map((r: any) => ({ ...r, tenantId: targetClinicId })),
         ]);
       }
-
-      // 7. Isolate Perio Charts
       if (backupData.perioCharts && Array.isArray(backupData.perioCharts)) {
         setAllPerioCharts((prev) => [
           ...prev.filter((pc) => pc.tenantId !== targetClinicId),
           ...backupData.perioCharts.map((pc: any) => ({ ...pc, tenantId: targetClinicId })),
         ]);
       }
-
-      // 8. Isolate Treatment Plans
       if (backupData.treatmentPlans && Array.isArray(backupData.treatmentPlans)) {
         setAllTreatmentPlans((prev) => [
           ...prev.filter((tp) => tp.tenantId !== targetClinicId),
           ...backupData.treatmentPlans.map((tp: any) => ({ ...tp, tenantId: targetClinicId })),
         ]);
       }
-
-      // 9. Isolate Operatory Chairs
       if (backupData.operatoryChairs && Array.isArray(backupData.operatoryChairs)) {
         setAllOperatoryChairs((prev) => [
           ...prev.filter((ch) => ch.tenantId !== targetClinicId),
@@ -1058,7 +835,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'BACKUP_RESTORED',
         'Backup',
         undefined,
-        `Successfully restored clinic data archive for tenant ${targetClinicId}`
+        `Successfully restored clinic data archive for tenant ${targetClinicId}`,
       );
       return { success: true };
     } catch (err: any) {
@@ -1072,24 +849,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         patients,
         appointments,
         services,
+        allServices: services,
         clinicalNotes,
         invoices,
-        systemHealth,
-        auditLogs: isSuperAdmin ? auditLogs : auditLogs.filter((a) => a.tenantId === currentTenantId),
+        auditLogs,
+        systemHealth: STATIC_SYSTEM_HEALTH,
+        loading,
+        refreshAll,
+
         prescriptions,
         radiographs,
         perioCharts,
         treatmentPlans,
         operatoryChairs,
-        allPatients,
-        allAppointments,
-        allInvoices,
-        allServices,
+
+        // Global lists / Backups
+        allPatients: patients,
+        allAppointments: appointments,
+        allInvoices: invoices,
+        allClinicalNotes: clinicalNotes,
+        allOperatoryChairs,
         allPrescriptions,
         allRadiographs,
         allPerioCharts,
         allTreatmentPlans,
-        allOperatoryChairs,
+
         addPatient,
         updatePatient,
         addAppointment,
@@ -1103,8 +887,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addInvoicePayment,
         markInvoicePaid,
         deleteInvoice,
-        logAuditEvent,
         checkAppointmentConflict,
+
         addPrescription,
         deletePrescription,
         addRadiograph,
@@ -1120,6 +904,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         assignChairAndSeat,
         updateInvoiceInsuranceClaim,
         restoreBackupData,
+        logAuditEvent,
       }}
     >
       {children}
@@ -1127,10 +912,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useData = () => {
-  const context = useContext(DataContext);
-  if (!context) {
-    throw new Error('useData must be used within a DataProvider');
-  }
-  return context;
+export const useData = (): DataContextType => {
+  const ctx = useContext(DataContext);
+  if (!ctx) throw new Error('useData must be used within a DataProvider');
+  return ctx;
 };

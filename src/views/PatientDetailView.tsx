@@ -44,7 +44,7 @@ import {
   TreatmentPhaseType,
   RadiographCategory,
 } from '../types';
-import { formatINR, formatINRCurrency } from '../utils/format';
+import { formatDateTime, formatINR, formatINRCurrency } from '../utils/format';
 
 interface PatientDetailViewProps {
   patientId: string;
@@ -509,7 +509,7 @@ export const PatientDetailView: React.FC<PatientDetailViewProps> = ({
                     <span className="font-semibold">Electronically Signed & Locked</span>
                   </div>
                   <div className="font-mono text-slate-700">
-                    {note.doctorSignature} • {note.signedAt}
+                    {note.doctorSignature} • {formatDateTime(note.signedAt)}
                   </div>
                 </div>
               </div>

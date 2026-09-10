@@ -12,7 +12,9 @@ import {
   Lock,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { AuditAction, AuditLogEntry } from '../../types';
+import { AuditLogEntry } from '../../types';
+import { toCsv, downloadCsv } from '../../utils/csv';
+import { formatDateTime } from '../../utils/format';
 
 interface AuditLogModalProps {
   isOpen: boolean;
@@ -47,7 +49,7 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose })
     return true;
   });
 
-  const getActionBadgeColor = (action: AuditAction) => {
+  const getActionBadgeColor = (action: string) => {
     if (action.includes('SECURITY') || action.includes('PASSWORD')) {
       return 'bg-purple-100 text-purple-800 border-purple-200';
     }
@@ -67,26 +69,20 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose })
   };
 
   const handleExportCSV = () => {
-    const headers = ['ID', 'Timestamp', 'User Name', 'User Role', 'Action', 'Resource Type', 'Resource ID', 'Details'];
-    const rows = filteredLogs.map((l) => [
-      l.id,
-      `"${l.timestamp}"`,
-      `"${l.userName}"`,
-      l.userRole,
-      l.action,
-      l.resourceType,
-      l.resourceId || '',
-      `"${(l.details || '').replace(/"/g, '""')}"`,
+    const csv = toCsv([
+      ['ID', 'Timestamp', 'User Name', 'User Role', 'Action', 'Resource Type', 'Resource ID', 'Details'],
+      ...filteredLogs.map((l) => [
+        l.id,
+        l.timestamp,
+        l.userName,
+        l.userRole,
+        l.action,
+        l.resourceType,
+        l.resourceId || '',
+        l.details || '',
+      ]),
     ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `dentrix_audit_trail_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(`dentrix_audit_trail_${new Date().toISOString().split('T')[0]}.csv`, csv);
   };
 
   return (
@@ -185,7 +181,7 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose })
                   filteredLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-surface-50/70 transition-colors">
                       <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                        {log.timestamp}
+                        {formatDateTime(log.timestamp)}
                       </td>
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
                         <div className="font-bold text-slate-900 text-xs">{log.userName}</div>

@@ -44,7 +44,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
       `Powered by Axiotronicx.Inc`;
 
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://api.whatsapp.com/send?text=${encodedMessage}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?text=${encodedMessage}`, '_blank', 'noopener,noreferrer');
   };
 
   return (

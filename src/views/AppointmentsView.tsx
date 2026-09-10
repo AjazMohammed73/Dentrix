@@ -21,8 +21,8 @@ import {
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { AppointmentStatus, Appointment } from '../types';
-import { formatINR } from '../utils/format';
+import { OperatoryChair, AppointmentStatus, Appointment } from '../types';
+import { formatINR, todayISO, shiftISO } from '../utils/format';
 import { ManageChairsModal } from '../components/modals/ManageChairsModal';
 import { AppointmentReminderModal } from '../components/modals/AppointmentReminderModal';
 
@@ -45,7 +45,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   } = useData();
   const { currentTenant } = useAuth();
 
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(todayISO);
   const [selectedChair, setSelectedChair] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'chairs' | 'day' | 'list' | 'queue'>('chairs');
   const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
@@ -101,20 +101,11 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     '17:00',
   ];
 
-  const handlePrevDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
-
-  const handleNextDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
+  const handlePrevDay = () => setSelectedDate((d) => shiftISO(d, -1));
+  const handleNextDay = () => setSelectedDate((d) => shiftISO(d, 1));
 
   const handleToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(todayISO());
   };
 
   const getStatusBadge = (status: AppointmentStatus) => {

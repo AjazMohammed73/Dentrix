@@ -302,7 +302,6 @@ export type AuditAction =
   | 'PAYMENT_RECORDED'
   | 'INVOICE_DELETED'
   | 'SERVICE_CREATED'
-  | 'SERVICE_UPDATED'
   | 'PRESCRIPTION_CREATED'
   | 'PRESCRIPTION_DELETED'
   | 'RADIOGRAPH_UPLOADED'
@@ -318,16 +317,22 @@ export type AuditAction =
   | 'CLAIM_SUBMITTED'
   | 'CLAIM_SETTLED'
   | 'BACKUP_EXPORTED'
-  | 'BACKUP_RESTORED';
+  | 'BACKUP_RESTORED'
+  | 'TENANT_CREATED'
+  | 'TENANT_UPDATED'
+  | 'DOCTOR_ADMIN_ASSIGNED'
+  | 'USER_CREATED'
+  | 'USER_UPDATED'
+  | 'USER_DELETED';
 
 export interface AuditLogEntry {
   id: string;
-  tenantId: string;
+  tenantId: string | null;
   timestamp: string;
-  userId: string;
+  userId: string | null;
   userName: string;
-  userRole: UserRole;
-  action: AuditAction;
+  userRole: UserRole | '';
+  action: AuditAction | string;
   resourceType:
     | 'Patient'
     | 'Appointment'
@@ -335,16 +340,19 @@ export interface AuditLogEntry {
     | 'Invoice'
     | 'Security'
     | 'Service'
+    | 'Tenant'
+    | 'User'
     | 'Prescription'
     | 'Radiograph'
     | 'PerioChart'
     | 'TreatmentPlan'
     | 'Chair'
     | 'Claim'
-    | 'Backup';
-  resourceId?: string;
+    | 'Backup'
+    | string;
+  resourceId?: string | null;
   details: string;
-  ipAddress?: string;
+  ipAddress?: string | null;
 }
 
 export interface SystemHealth {
