@@ -1,26 +1,20 @@
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
 
-const TOKEN_KEY = 'dentrix_token';
-
+// Access token lives in memory only — never localStorage/sessionStorage. It is
+// re-minted on page load (and on 401) from an HttpOnly refresh cookie.
 let token: string | null = null;
-try {
-  token = sessionStorage.getItem(TOKEN_KEY);
-} catch {
-  /* private mode / storage disabled */
-}
 
 export function setToken(next: string | null): void {
   token = next;
-  try {
-    if (next) sessionStorage.setItem(TOKEN_KEY, next);
-    else sessionStorage.removeItem(TOKEN_KEY);
-  } catch {
-    /* ignore */
-  }
 }
 
 export function getToken(): string | null {
   return token;
+}
+
+function csrfFromCookie(): string {
+  const hit = document.cookie.split('; ').find((c) => c.startsWith('dentrix_csrf='));
+  return hit ? decodeURIComponent(hit.split('=').slice(1).join('=')) : '';
 }
 
 export class ApiError extends Error {
@@ -34,10 +28,38 @@ export class ApiError extends Error {
   }
 }
 
+let refreshing: Promise<boolean> | null = null;
+
+/** Try to mint a fresh access token from the refresh cookie. De-duped across callers. */
+export function refreshAccessToken(): Promise<boolean> {
+  if (!refreshing) {
+    refreshing = (async () => {
+      try {
+        const res = await fetch(`${BASE}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'X-CSRF-Token': csrfFromCookie() },
+        });
+        if (!res.ok) return false;
+        const data = (await res.json()) as { accessToken?: string };
+        if (!data.accessToken) return false;
+        setToken(data.accessToken);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshing = null;
+      }
+    })();
+  }
+  return refreshing;
+}
+
 interface Options {
   method?: string;
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
+  _retried?: boolean;
 }
 
 export async function api<T>(path: string, opts: Options = {}): Promise<T> {
@@ -51,16 +73,20 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (path === '/auth/logout') headers['X-CSRF-Token'] = csrfFromCookie();
 
   const res = await fetch(url.toString(), {
     method: opts.method ?? 'GET',
     headers,
+    credentials: 'include', // send/receive the auth cookies on /auth/*
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
 
-  // A 401 from an authed request means the session died — recover. A 401 from the
-  // login call itself is just a wrong password; leave any existing session alone.
-  if (res.status === 401 && !path.startsWith('/auth/login')) {
+  // Session expired mid-use: try one silent refresh + retry, else fall through to 401.
+  if (res.status === 401 && !path.startsWith('/auth/') && !opts._retried) {
+    if (await refreshAccessToken()) {
+      return api<T>(path, { ...opts, _retried: true });
+    }
     setToken(null);
     window.dispatchEvent(new Event('dentrix:unauthorized'));
   }

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { ClinicTenant, User, UserPermissions } from '../types';
-import { ApiError, api, getToken, setToken } from '../lib/api';
+import { ApiError, api, refreshAccessToken, setToken } from '../lib/api';
 
 interface StaffInput {
   name: string;
@@ -89,13 +89,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [clearSession]);
 
   useEffect(() => {
-    if (!getToken()) {
-      setLoading(false);
-      return;
-    }
     (async () => {
       try {
-        await hydrate(await api<User>('/auth/me'));
+        // Restore the session from the HttpOnly refresh cookie (nothing is persisted
+        // client-side). No cookie / expired -> stay logged out.
+        if (await refreshAccessToken()) {
+          await hydrate(await api<User>('/auth/me'));
+        }
       } catch {
         setToken(null);
       } finally {
@@ -121,7 +121,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => clearSession();
+  const logout = () => {
+    void api('/auth/logout', { method: 'POST' }).catch(() => undefined); // clears server cookies
+    clearSession();
+  };
 
   const refresh = useCallback(async () => {
     if (currentUser) await hydrate(await api<User>('/auth/me'));

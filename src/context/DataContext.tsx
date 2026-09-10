@@ -11,6 +11,7 @@ import {
   SystemHealth,
 } from '../types';
 import { ApiError, api } from '../lib/api';
+import { isoAfterDays } from '../utils/format';
 import { useAuth } from './AuthContext';
 
 // Decorative infra telemetry — there is no `/system-health` endpoint (see CONTEXT.md).
@@ -86,9 +87,15 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const safeList = async <T,>(path: string): Promise<T[]> => {
+type Query = Record<string, string | number | undefined>;
+
+// Everything the app filters/searches client-side, so pull a generous page (the API
+// caps at 1000). Server-side ?q / paged UI is the follow-up if a clinic exceeds this.
+const PAGE = 1000;
+
+const safeList = async <T,>(path: string, query?: Query): Promise<T[]> => {
   try {
-    return await api<T[]>(path);
+    return await api<T[]>(path, { query: { limit: PAGE, ...query } });
   } catch (e) {
     // 403 => this role legitimately can't see this list; treat as empty.
     // Anything else (5xx, network, CORS) is a real failure — surface it.
@@ -121,7 +128,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadPatients = useCallback(() => safeList<Patient>('/patients').then(setPatients), []);
   const loadServices = useCallback(() => safeList<DentalService>('/services').then(setServices), []);
   const loadAppointments = useCallback(
-    () => safeList<Appointment>('/appointments').then(setAppointments),
+    () =>
+      // a ~8-month window around today rather than all history
+      safeList<Appointment>('/appointments', {
+        from: isoAfterDays(-120),
+        to: isoAfterDays(120),
+      }).then(setAppointments),
     [],
   );
   const loadNotes = useCallback(

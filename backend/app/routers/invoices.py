@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..audit import record_audit
 from ..billing import apply_patient_balance, next_invoice_number, recompute_invoice
 from ..database import get_db
-from ..dependencies import require_billing_access, require_permission, scoped
+from ..dependencies import Pagination, require_billing_access, require_permission, scoped
 from ..models import Invoice, Patient, PaymentInstallment, User
 from ..schemas.common import InstallmentMethod
 from ..schemas.invoice import InvoiceCreate, InvoiceOut, InvoicePaymentRequest
@@ -50,11 +50,13 @@ def _record_payment(
 
 
 @router.get("", response_model=list[InvoiceOut])
-def list_invoices(user: ViewRevenue, db: DbSession) -> list[Invoice]:
+def list_invoices(user: ViewRevenue, db: DbSession, page: Pagination) -> list[Invoice]:
     stmt = (
         scoped(select(Invoice), Invoice.tenant_id, user)
         .options(selectinload(Invoice.installments))
         .order_by(Invoice.date.desc())
+        .limit(page.limit)
+        .offset(page.offset)
     )
     invoices = list(db.scalars(stmt))
     # Derive "Overdue" on read — nothing persists it. (Not committed here.)
