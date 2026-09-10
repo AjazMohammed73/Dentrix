@@ -202,29 +202,59 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
                     <td className="py-2.5 px-2.5 border-r border-black font-medium">
                       <div className="font-bold uppercase text-[11px]">{invoice.serviceName}</div>
                       <span className="text-[10px]">Clinical Operative Procedure & Consultation</span>
+                      {invoice.insuranceClaim && (
+                        <div className="mt-1 inline-block border border-black px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                          Claim #{invoice.insuranceClaim.claimNumber} • {invoice.insuranceClaim.payerName} ({invoice.insuranceClaim.status.toUpperCase()})
+                        </div>
+                      )}
                     </td>
                     <td className="py-2.5 px-2 text-center border-r border-black font-mono">1</td>
-                    <td className="py-2.5 px-2.5 text-right border-r border-black font-mono">{formatINR(invoice.amount)}</td>
-                    <td className="py-2.5 px-2.5 text-right font-mono font-bold">{formatINR(invoice.amount)}</td>
+                    <td className="py-2.5 px-2.5 text-right border-r border-black font-mono">{formatINR(invoice.subtotal || invoice.amount)}</td>
+                    <td className="py-2.5 px-2.5 text-right font-mono font-bold">{formatINR(invoice.subtotal || invoice.amount)}</td>
                   </tr>
                 </tbody>
               </table>
 
               {/* Total Calculation Summary */}
               <div className="flex justify-end pt-1">
-                <div className="w-60 border border-black text-[11px]">
+                <div className="w-64 border border-black text-[11px]">
                   <div className="flex justify-between px-2.5 py-1 border-b border-black text-black">
-                    <span>Subtotal:</span>
-                    <span className="font-mono font-bold">{formatINR(invoice.amount)}</span>
+                    <span>Base Subtotal:</span>
+                    <span className="font-mono font-bold">{formatINR(invoice.subtotal || invoice.amount)}</span>
                   </div>
-                  <div className="flex justify-between px-2.5 py-1 border-b border-black text-black">
-                    <span>Medical GST (0% Exempt):</span>
-                    <span className="font-mono">₹0</span>
-                  </div>
+                  {Boolean(invoice.discountAmount && invoice.discountAmount > 0) && (
+                    <div className="flex justify-between px-2.5 py-1 border-b border-black text-black">
+                      <span>Discount ({invoice.discountType === 'percentage' ? `${invoice.discountValue}%` : 'Flat'}):</span>
+                      <span className="font-mono">(-) {formatINR(invoice.discountAmount || 0)}</span>
+                    </div>
+                  )}
+                  {Boolean(invoice.taxAmount && invoice.taxAmount > 0) ? (
+                    <>
+                      <div className="flex justify-between px-2.5 py-0.5 border-b border-black text-black text-[10px]">
+                        <span>CGST ({(invoice.taxRatePercent || 18) / 2}%):</span>
+                        <span className="font-mono">+{formatINR(invoice.cgstAmount || 0)}</span>
+                      </div>
+                      <div className="flex justify-between px-2.5 py-0.5 border-b border-black text-black text-[10px]">
+                        <span>SGST ({(invoice.taxRatePercent || 18) / 2}%):</span>
+                        <span className="font-mono">+{formatINR(invoice.sgstAmount || 0)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between px-2.5 py-1 border-b border-black text-black">
+                      <span>Healthcare GST:</span>
+                      <span className="font-mono">₹0 (Exempt)</span>
+                    </div>
+                  )}
                   <div className="flex justify-between px-2.5 py-1.5 border-b border-black text-black font-black text-xs">
-                    <span>Total Bill:</span>
+                    <span>Total Payable:</span>
                     <span className="font-mono">{formatINR(invoice.amount)}</span>
                   </div>
+                  {Boolean(invoice.insuranceClaim && invoice.insuranceClaim.approvedAmount) && (
+                    <div className="flex justify-between px-2.5 py-1 border-b border-black text-black">
+                      <span>Insurance Approved:</span>
+                      <span className="font-mono">(-) {formatINR(invoice.insuranceClaim?.approvedAmount || 0)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between px-2.5 py-1 border-b border-black text-black">
                     <span>Amount Paid:</span>
                     <span className="font-mono">(-) {formatINR(invoice.amountPaid)}</span>

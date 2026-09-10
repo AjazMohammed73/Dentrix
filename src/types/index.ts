@@ -139,18 +139,34 @@ export interface DentalService {
   isActive: boolean;
 }
 
+export type OperatoryChairType =
+  | 'General'
+  | 'Hygiene'
+  | 'Surgery'
+  | 'Orthodontics'
+  | 'Pediatric'
+  | 'Implant';
+
+export interface OperatoryChairConfig {
+  id: string;
+  tenantId: string;
+  name: string;
+  roomNumber?: string;
+  chairType: OperatoryChairType;
+  isActive: boolean;
+  color?: string;
+}
+
 export type AppointmentStatus =
   | 'Scheduled'
+  | 'Arrived'
   | 'In-Chair'
   | 'Delayed'
   | 'Completed'
   | 'Cancelled'
   | 'No-Show';
 
-export type OperatoryChair =
-  | 'Chair 1 - Hygiene'
-  | 'Chair 2 - Surgery'
-  | 'Chair 3 - General';
+export type OperatoryChair = string;
 
 export interface Appointment {
   id: string;
@@ -171,6 +187,9 @@ export interface Appointment {
   status: AppointmentStatus;
   notes?: string;
   fee: number;
+  arrivedAt?: string; // ISO timestamp when patient arrived at reception
+  inChairAt?: string; // ISO timestamp when seated in chair
+  completedAt?: string; // ISO timestamp when appointment completed
 }
 
 export type InvoiceStatus = 'Paid' | 'Pending' | 'Overdue';
@@ -186,6 +205,39 @@ export interface PaymentInstallment {
   notes?: string;
 }
 
+export type InsuranceClaimStatus =
+  | 'Draft'
+  | 'Submitted'
+  | 'Under Review'
+  | 'Approved'
+  | 'Settled'
+  | 'Rejected';
+
+export interface InsuranceClaim {
+  id: string;
+  tenantId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  patientId: string;
+  patientName: string;
+  payerName: string;
+  claimNumber?: string;
+  policyNumber?: string;
+  preAuthNumber?: string;
+  claimedAmount: number;
+  approvedAmount?: number;
+  patientCoPay?: number;
+  coPayAmount?: number;
+  status: InsuranceClaimStatus;
+  submittedDate?: string;
+  submissionDate?: string;
+  settledDate?: string;
+  settlementDate?: string;
+  diagnosisCode?: string;
+  denialReason?: string;
+  notes?: string;
+}
+
 export interface Invoice {
   id: string;
   tenantId: string;
@@ -194,7 +246,7 @@ export interface Invoice {
   patientName: string;
   appointmentId?: string;
   serviceName: string;
-  amount: number;
+  amount: number; // Final net payable amount
   amountPaid: number;
   balance: number;
   date: string;
@@ -202,13 +254,36 @@ export interface Invoice {
   status: InvoiceStatus;
   paymentMethod?: 'Credit Card' | 'Insurance' | 'Cash' | 'Debit Card' | 'UPI / Bank';
   installments?: PaymentInstallment[];
+
+  // Discounts & Itemized Taxes
+  subtotal?: number;
+  discountType?: 'flat' | 'percentage';
+  discountValue?: number;
+  discountAmount?: number;
+  taxRatePercent?: number; // e.g. 18 for GST
+  taxAmount?: number;
+  cgstAmount?: number; // 9%
+  sgstAmount?: number; // 9%
+
+  // Dental Insurance Claim
   insuranceClaim?: {
     claimId: string;
-    status: 'Draft' | 'Submitted' | 'Under Review' | 'Approved' | 'Settled' | 'Rejected';
+    claimNumber?: string;
+    status: InsuranceClaimStatus;
     payerName: string;
+    policyNumber?: string;
+    preAuthNumber?: string;
     claimedAmount: number;
     approvedAmount?: number;
+    patientCoPay?: number;
+    coPayAmount?: number;
     submittedDate?: string;
+    submissionDate?: string;
+    settledDate?: string;
+    settlementDate?: string;
+    diagnosisCode?: string;
+    denialReason?: string;
+    notes?: string;
   };
 }
 
@@ -227,7 +302,23 @@ export type AuditAction =
   | 'PAYMENT_RECORDED'
   | 'INVOICE_DELETED'
   | 'SERVICE_CREATED'
-  | 'SERVICE_UPDATED';
+  | 'SERVICE_UPDATED'
+  | 'PRESCRIPTION_CREATED'
+  | 'PRESCRIPTION_DELETED'
+  | 'RADIOGRAPH_UPLOADED'
+  | 'RADIOGRAPH_DELETED'
+  | 'PERIO_CHART_UPDATED'
+  | 'TREATMENT_PLAN_CREATED'
+  | 'TREATMENT_PLAN_UPDATED'
+  | 'CHAIR_CREATED'
+  | 'CHAIR_UPDATED'
+  | 'CHAIR_DELETED'
+  | 'PATIENT_CHECKED_IN'
+  | 'PATIENT_SEATED'
+  | 'CLAIM_SUBMITTED'
+  | 'CLAIM_SETTLED'
+  | 'BACKUP_EXPORTED'
+  | 'BACKUP_RESTORED';
 
 export interface AuditLogEntry {
   id: string;
@@ -237,7 +328,20 @@ export interface AuditLogEntry {
   userName: string;
   userRole: UserRole;
   action: AuditAction;
-  resourceType: 'Patient' | 'Appointment' | 'ClinicalNote' | 'Invoice' | 'Security' | 'Service';
+  resourceType:
+    | 'Patient'
+    | 'Appointment'
+    | 'ClinicalNote'
+    | 'Invoice'
+    | 'Security'
+    | 'Service'
+    | 'Prescription'
+    | 'Radiograph'
+    | 'PerioChart'
+    | 'TreatmentPlan'
+    | 'Chair'
+    | 'Claim'
+    | 'Backup';
   resourceId?: string;
   details: string;
   ipAddress?: string;
@@ -255,3 +359,126 @@ export interface SystemHealth {
   activeTenantsCount: number;
   totalAppointmentsToday: number;
 }
+
+// ---------------------------------------------------------------------------
+// Clinical Suite Types (e-Rx, Imaging, Perio Probing, Treatment Planning)
+// ---------------------------------------------------------------------------
+
+export interface PrescriptionItem {
+  id: string;
+  drugName: string;
+  dosage: string;
+  frequency: 'OD (Once Daily)' | 'BD (Twice Daily)' | 'TDS (Thrice Daily)' | 'QDS (4x Daily)' | 'SOS (As Needed)' | string;
+  durationDays: number;
+  timing: 'After Food' | 'Before Food' | 'With Food' | 'Anytime';
+  instructions?: string;
+}
+
+export interface DentalPrescription {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  patientName: string;
+  patientAge?: number;
+  patientGender?: string;
+  doctorId: string;
+  doctorName: string;
+  doctorRegistrationNumber?: string;
+  date: string; // YYYY-MM-DD
+  diagnosis: string;
+  items: PrescriptionItem[];
+  notes?: string;
+  createdAt: string;
+}
+
+export type RadiographCategory =
+  | 'IOPA (Periapical)'
+  | 'Bitewing'
+  | 'OPG (Panoramic)'
+  | 'CBCT 3D'
+  | 'Intraoral Photo'
+  | 'Cephalometric';
+
+export interface DentalRadiograph {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  title: string;
+  category: RadiographCategory;
+  dateTaken: string;
+  toothNumbers?: number[];
+  imageUrl: string;
+  findings: string;
+  takenBy: string;
+  notes?: string;
+}
+
+export interface PerioSiteMeasurement {
+  depth: number; // in mm, e.g. 1 to 12
+  bop: boolean; // Bleeding on Probing
+}
+
+export interface PerioToothRecord {
+  toothNumber: number;
+  buccal: {
+    distal: PerioSiteMeasurement;
+    middle: PerioSiteMeasurement;
+    mesial: PerioSiteMeasurement;
+  };
+  lingual: {
+    distal: PerioSiteMeasurement;
+    middle: PerioSiteMeasurement;
+    mesial: PerioSiteMeasurement;
+  };
+  furcation?: 'None' | 'Class I' | 'Class II' | 'Class III';
+  mobility?: '0' | 'I' | 'II' | 'III';
+  isMissing?: boolean;
+}
+
+export interface PeriodontalChart {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  examDate: string;
+  examinedBy: string;
+  teeth: Record<number, PerioToothRecord>;
+  summaryNotes?: string;
+}
+
+export type TreatmentPhaseType =
+  | 'Phase 1: Emergency & Pain Relief'
+  | 'Phase 2: Disease Control & Endodontics'
+  | 'Phase 3: Prosthetics & Rehabilitation'
+  | 'Phase 4: Maintenance & Prevention';
+
+export interface TreatmentPlanItem {
+  id: string;
+  serviceCode: string;
+  procedureName: string;
+  toothNumber?: number;
+  estimatedFee: number;
+  status: 'Proposed' | 'Accepted' | 'In-Progress' | 'Completed' | 'Declined';
+  priority: 'Urgent' | 'Standard' | 'Elective';
+  notes?: string;
+}
+
+export interface TreatmentPhase {
+  id: string;
+  phaseType: TreatmentPhaseType;
+  items: TreatmentPlanItem[];
+}
+
+export interface PatientTreatmentPlan {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  title: string;
+  createdDate: string;
+  createdBy: string;
+  phases: TreatmentPhase[];
+  totalEstimatedFee: number;
+  acceptedFee: number;
+  status: 'Draft' | 'Presented' | 'Accepted' | 'Completed';
+  patientAcceptedDate?: string;
+}
+

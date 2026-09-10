@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { Sidebar, NavRoute } from './components/layout/Sidebar';
@@ -15,7 +15,7 @@ import { ServicesView } from './views/ServicesView';
 import { SuperAdminView } from './views/SuperAdminView';
 import { LandingPageView } from './views/LandingPageView';
 
-// Modals
+// Modals & Common Components
 import { BookAppointmentModal } from './components/modals/BookAppointmentModal';
 import { AddPatientModal } from './components/modals/AddPatientModal';
 import { AddServiceModal } from './components/modals/AddServiceModal';
@@ -24,10 +24,13 @@ import { OnboardTenantModal } from './components/modals/OnboardTenantModal';
 import { SignInModal } from './components/modals/SignInModal';
 import { CreateInvoiceModal } from './components/modals/CreateInvoiceModal';
 import { InvoicePrintModal } from './components/modals/InvoicePrintModal';
+import { ClinicBackupModal } from './components/modals/ClinicBackupModal';
+import { PrivacyLockScreen } from './components/common/PrivacyLockScreen';
+import { StorageMonitor } from './components/common/StorageMonitor';
 import { Invoice } from './types';
 
 const AppContent: React.FC = () => {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { currentUser, currentTenant, isAuthenticated } = useAuth();
   const [showLandingPage, setShowLandingPage] = useState<boolean>(true);
   const [isSignInOpen, setIsSignInOpen] = useState<boolean>(false);
   const [currentRoute, setCurrentRoute] = useState<NavRoute>('dashboard');
@@ -43,6 +46,48 @@ const AppContent: React.FC = () => {
   const [isAddServiceOpen, setIsAddServiceOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isOnboardTenantOpen, setIsOnboardTenantOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isWorkstationLocked, setIsWorkstationLocked] = useState<boolean>(() => {
+    return sessionStorage.getItem('dentrix_workstation_locked') === 'true';
+  });
+
+  const handleLockWorkstation = () => {
+    sessionStorage.setItem('dentrix_workstation_locked', 'true');
+    setIsWorkstationLocked(true);
+  };
+
+  const handleUnlockWorkstation = () => {
+    sessionStorage.removeItem('dentrix_workstation_locked');
+    setIsWorkstationLocked(false);
+  };
+
+  // 5-Minute Inactivity Auto-Lock for Chairside PHI Protection
+  useEffect(() => {
+    if (!isAuthenticated || showLandingPage || isWorkstationLocked) return;
+
+    let timeoutId: any;
+    const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+    const resetInactivityTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLockWorkstation();
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const trackedEvents = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    trackedEvents.forEach((evt) =>
+      window.addEventListener(evt, resetInactivityTimer, { passive: true })
+    );
+    resetInactivityTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      trackedEvents.forEach((evt) =>
+        window.removeEventListener(evt, resetInactivityTimer)
+      );
+    };
+  }, [isAuthenticated, showLandingPage, isWorkstationLocked]);
 
   const handleOpenCreateInvoice = (patientId?: string) => {
     setCreateInvoicePatientId(patientId);
@@ -116,6 +161,10 @@ const AppContent: React.FC = () => {
           onOpenCreateInvoice={() => handleOpenCreateInvoice()}
           onViewLandingPage={() => setShowLandingPage(true)}
           onSignOut={handleSignOut}
+          onSelectPatient={handleSelectPatient}
+          onNavigate={handleNavigate}
+          onLockWorkstation={handleLockWorkstation}
+          onOpenBackup={() => setIsBackupModalOpen(true)}
         />
 
         {/* Dynamic Route Content */}
@@ -181,6 +230,32 @@ const AppContent: React.FC = () => {
             </>
           )}
         </main>
+
+        {/* Clinic Status & Storage Telemetry Footer */}
+        <footer className="h-7 bg-white border-t border-border px-4 flex items-center justify-between text-[11px] text-slate-500 z-10 flex-shrink-0 select-none">
+          <div className="flex items-center space-x-3">
+            <span className="font-bold text-slate-700">Dentrix Clinical OS</span>
+            <span className="text-slate-300">•</span>
+            <span className="font-medium text-slate-600">{currentTenant?.name || 'Apex Dental'}</span>
+            <span className="text-slate-300">•</span>
+            <span className="hidden sm:inline text-emerald-700 font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+              IndexedDB Mirror Active
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <StorageMonitor onOpenBackupCenter={() => setIsBackupModalOpen(true)} />
+            <span className="text-slate-300 hidden md:inline">•</span>
+            <button
+              onClick={handleLockWorkstation}
+              className="text-slate-500 hover:text-slate-900 transition-colors font-semibold hidden md:inline"
+              title="Lock Operatory Workstation"
+            >
+              Lock Terminal (PIN: 1234)
+            </button>
+          </div>
+        </footer>
       </div>
 
       {/* Global Modals */}
@@ -191,7 +266,10 @@ const AppContent: React.FC = () => {
       />
       <BookAppointmentModal
         isOpen={isBookModalOpen}
-        onClose={() => setIsBookModalOpen(false)}
+        onClose={() => {
+          setIsBookModalOpen(false);
+          setBookModalPatientId(undefined);
+        }}
         initialPatientId={bookModalPatientId}
       />
 
@@ -231,6 +309,18 @@ const AppContent: React.FC = () => {
         isOpen={!!createdInvoiceForPrint}
         onClose={() => setCreatedInvoiceForPrint(null)}
         invoice={createdInvoiceForPrint}
+      />
+
+      {/* Clinic Statutory Data Backup & Disaster Recovery Modal */}
+      <ClinicBackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+      />
+
+      {/* Operatory Privacy Screen Auto / Manual Lock Overlay */}
+      <PrivacyLockScreen
+        isOpen={isWorkstationLocked}
+        onUnlock={handleUnlockWorkstation}
       />
     </div>
   );

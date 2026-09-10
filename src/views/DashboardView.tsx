@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   CalendarDays,
   Users,
@@ -15,14 +15,16 @@ import {
   Activity,
   ArrowRight,
   FileText,
+  MessageSquare,
 } from 'lucide-react';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { NavRoute } from '../components/layout/Sidebar';
-import { AppointmentStatus } from '../types';
+import { AppointmentStatus, Appointment } from '../types';
 import { formatINR } from '../utils/format';
+import { AppointmentReminderModal } from '../components/modals/AppointmentReminderModal';
 
 interface DashboardViewProps {
   onNavigate: (route: NavRoute) => void;
@@ -44,7 +46,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     invoices,
     systemHealth,
     updateAppointmentStatus,
+    operatoryChairs,
   } = useData();
+  const [reminderAppointment, setReminderAppointment] = useState<Appointment | null>(null);
 
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
   const canViewRevenue = currentUser.permissions.canViewRevenue || isSuperAdmin;
@@ -60,36 +64,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .filter((i) => i.status !== 'Paid')
     .reduce((sum, i) => sum + i.balance, 0);
 
-  // Operatory Chair Statuses
-  const chairs = [
-    {
-      name: 'Chair 1 - Hygiene',
-      currentApt: todaysAppointments.find(
-        (a) => a.operatoryChair === 'Chair 1 - Hygiene' && a.status === 'In-Chair'
-      ),
-      nextApt: todaysAppointments.find(
-        (a) => a.operatoryChair === 'Chair 1 - Hygiene' && a.status === 'Scheduled'
-      ),
-    },
-    {
-      name: 'Chair 2 - Surgery',
-      currentApt: todaysAppointments.find(
-        (a) => a.operatoryChair === 'Chair 2 - Surgery' && a.status === 'In-Chair'
-      ),
-      nextApt: todaysAppointments.find(
-        (a) => a.operatoryChair === 'Chair 2 - Surgery' && a.status === 'Scheduled'
-      ),
-    },
-    {
-      name: 'Chair 3 - General',
-      currentApt: todaysAppointments.find(
-        (a) => a.operatoryChair === 'Chair 3 - General' && a.status === 'In-Chair'
-      ),
-      nextApt: todaysAppointments.find(
-        (a) => a.operatoryChair === 'Chair 3 - General' && a.status === 'Scheduled'
-      ),
-    },
-  ];
+  // Operatory Chair Statuses from Dynamic Context
+  const activeChairsList = operatoryChairs.filter((c) => c.isActive);
+  const chairs = (
+    activeChairsList.length > 0
+      ? activeChairsList
+      : [
+          { id: '1', name: 'Chair 1 - Hygiene', chairType: 'Hygiene' as const },
+          { id: '2', name: 'Chair 2 - Surgery', chairType: 'Surgery' as const },
+          { id: '3', name: 'Chair 3 - General', chairType: 'General' as const },
+        ]
+  ).map((c) => ({
+    name: c.name,
+    currentApt: todaysAppointments.find(
+      (a) => a.operatoryChair === c.name && a.status === 'In-Chair'
+    ),
+    nextApt: todaysAppointments.find(
+      (a) => a.operatoryChair === c.name && (a.status === 'Scheduled' || a.status === 'Arrived')
+    ),
+  }));
+
+  const waitingToday = todaysAppointments.filter((a) => a.status === 'Arrived');
 
   if (isSuperAdmin) {
     return (
@@ -318,7 +313,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <span className="text-xs text-slate-600 font-medium">Real-time operatory flow</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {waitingToday.length > 0 && (
+          <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-xs animate-fade-in shadow-xs">
+            <div className="flex items-center gap-2 text-amber-900 font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+              <span>
+                {waitingToday.length} patient{waitingToday.length > 1 ? 's' : ''} currently waiting
+                in reception
+              </span>
+            </div>
+            <button
+              onClick={() => onNavigate('appointments')}
+              className="font-bold text-amber-800 hover:text-amber-950 underline flex items-center gap-1"
+            >
+              <span>Manage Waiting Room Queue</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {chairs.map((chair) => (
             <div
               key={chair.name}
@@ -452,20 +466,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </Badge>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <select
-                          value={apt.status}
-                          onChange={(e) =>
-                            updateAppointmentStatus(apt.id, e.target.value as AppointmentStatus)
-                          }
-                          className="bg-surface-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-700 focus:outline-none"
-                        >
-                          <option value="Scheduled">Scheduled</option>
-                          <option value="In-Chair">In-Chair</option>
-                          <option value="Delayed">Delayed</option>
-                          <option value="Completed">Completed</option>
-                          <option value="Cancelled">Cancelled</option>
-                          <option value="No-Show">No-Show</option>
-                        </select>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setReminderAppointment(apt)}
+                            className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors border border-slate-200"
+                            title="Send WhatsApp Confirmation"
+                          >
+                            <MessageSquare size={14} />
+                          </button>
+                          <select
+                            value={apt.status}
+                            onChange={(e) =>
+                              updateAppointmentStatus(apt.id, e.target.value as AppointmentStatus)
+                            }
+                            className="bg-surface-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                          >
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="Arrived">Arrived (Waiting)</option>
+                            <option value="In-Chair">In-Chair</option>
+                            <option value="Delayed">Delayed</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                            <option value="No-Show">No-Show</option>
+                          </select>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -475,6 +500,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Appointment Reminder Modal */}
+      <AppointmentReminderModal
+        isOpen={!!reminderAppointment}
+        onClose={() => setReminderAppointment(null)}
+        appointment={reminderAppointment}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bell,
   Search,
@@ -12,16 +12,23 @@ import {
   LucideIcon,
   LogOut,
   FileText,
+  Lock,
+  Database,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 import { AuditLogModal } from '../modals/AuditLogModal';
+import { CommandPalette } from '../common/CommandPalette';
 
 interface TopHeaderProps {
   onQuickBook: () => void;
   onOpenCreateInvoice?: () => void;
   onViewLandingPage?: () => void;
   onSignOut?: () => void;
+  onSelectPatient?: (patientId: string) => void;
+  onNavigate?: (route: any) => void;
+  onLockWorkstation?: () => void;
+  onOpenBackup?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -29,6 +36,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenCreateInvoice,
   onViewLandingPage,
   onSignOut,
+  onSelectPatient = () => {},
+  onNavigate = () => {},
+  onLockWorkstation,
+  onOpenBackup,
 }) => {
   const {
     currentUser,
@@ -41,7 +52,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
   const canViewAudit = currentUser.role === 'DOCTOR_ADMIN' || currentUser.role === 'SUPER_ADMIN';
+  const canManageBackup = currentUser.role === 'DOCTOR_ADMIN' || currentUser.role === 'SUPER_ADMIN';
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
+  // Global Ctrl+K / Cmd+K listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const roles: { role: UserRole; label: string; icon: LucideIcon }[] = [
     { role: 'SUPER_ADMIN', label: 'Super Admin', icon: ShieldCheck },
@@ -79,14 +104,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </div>
         )}
 
-        {/* Global search */}
+        {/* Global search Omnibox Trigger */}
         <div className="relative flex-1 hidden md:block">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search patients by name, phone, or CDT code..."
-            className="w-full bg-surface-50 border border-border/80 rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-all"
-          />
+          <button
+            type="button"
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="w-full bg-surface-50 hover:bg-surface-100 border border-border/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-400 flex items-center justify-between transition-all group cursor-pointer shadow-2xs"
+          >
+            <div className="flex items-center">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-primary-600 transition-colors" />
+              <span className="text-slate-500 font-medium truncate">
+                Search patients, CDT codes, appointments...
+              </span>
+            </div>
+            <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white text-slate-500 rounded border border-slate-200 shadow-2xs">
+              Ctrl K
+            </kbd>
+          </button>
         </div>
       </div>
 
@@ -169,6 +203,30 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <span className="hidden md:inline">Sign Out</span>
         </button>
 
+        {/* Backup & Disaster Recovery Center - Guarded for Admins */}
+        {onOpenBackup && canManageBackup && (
+          <button
+            onClick={onOpenBackup}
+            className="flex items-center space-x-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+            title="Clinic Statutory Data Backup & Disaster Recovery"
+          >
+            <Database size={14} className="text-sky-700" />
+            <span className="hidden sm:inline">Backup</span>
+          </button>
+        )}
+
+        {/* Lock Workstation (Privacy Screen) */}
+        {onLockWorkstation && (
+          <button
+            onClick={onLockWorkstation}
+            className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+            title="Lock Chairside Terminal (HIPAA PHI Privacy Lock)"
+          >
+            <Lock size={14} className="text-slate-600" />
+            <span className="hidden sm:inline">Lock</span>
+          </button>
+        )}
+
         {/* Audit Trail Trigger */}
         {canViewAudit && (
           <button
@@ -197,6 +255,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       <AuditLogModal
         isOpen={isAuditModalOpen}
         onClose={() => setIsAuditModalOpen(false)}
+      />
+
+      {/* Global Command Palette Omnibox */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectPatient={onSelectPatient}
+        onNavigate={onNavigate}
+        onQuickBook={onQuickBook}
+        onOpenCreateInvoice={onOpenCreateInvoice}
+        onOpenAudit={() => setIsAuditModalOpen(true)}
       />
     </header>
   );

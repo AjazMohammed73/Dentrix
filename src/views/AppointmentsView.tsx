@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -12,11 +12,19 @@ import {
   CheckCircle,
   Trash2,
   AlertTriangle,
+  MessageSquare,
+  Sparkles,
+  Users,
+  Check,
+  Phone,
 } from 'lucide-react';
 import { Badge } from '../components/common/Badge';
 import { useData } from '../context/DataContext';
-import { OperatoryChair, AppointmentStatus, Appointment } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { AppointmentStatus, Appointment } from '../types';
 import { formatINR } from '../utils/format';
+import { ManageChairsModal } from '../components/modals/ManageChairsModal';
+import { AppointmentReminderModal } from '../components/modals/AppointmentReminderModal';
 
 interface AppointmentsViewProps {
   onBookAppointment: () => void;
@@ -27,12 +35,38 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
   onBookAppointment,
   onSelectPatient,
 }) => {
-  const { appointments, updateAppointmentStatus, deleteAppointment } = useData();
+  const {
+    appointments,
+    updateAppointmentStatus,
+    deleteAppointment,
+    operatoryChairs,
+    markPatientArrived,
+    assignChairAndSeat,
+  } = useData();
+  const { currentTenant } = useAuth();
 
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedChair, setSelectedChair] = useState<string>('All');
-  const [viewMode, setViewMode] = useState<'day' | 'chairs' | 'list'>('chairs');
+  const [viewMode, setViewMode] = useState<'chairs' | 'day' | 'list' | 'queue'>('chairs');
   const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
+
+  // Modals state
+  const [isManageChairsOpen, setIsManageChairsOpen] = useState(false);
+  const [reminderAppointment, setReminderAppointment] = useState<Appointment | null>(null);
+
+  // Real-time ticker for elapsed waiting minutes (ticks every 30s)
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Filter active chairs from data context
+  const activeChairs = operatoryChairs.filter((c) => c.isActive);
+  const chairNames =
+    activeChairs.length > 0
+      ? activeChairs.map((c) => c.name)
+      : ['Chair 1 - Hygiene', 'Chair 2 - Surgery', 'Chair 3 - General'];
 
   const filteredAppointments = appointments.filter((a) => {
     const matchesDate = a.date === selectedDate;
@@ -40,11 +74,19 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     return matchesDate && matchesChair;
   });
 
-  const chairs: OperatoryChair[] = [
-    'Chair 1 - Hygiene',
-    'Chair 2 - Surgery',
-    'Chair 3 - General',
-  ];
+  // Calculate Waiting Room queue count for selected date
+  const waitingPatients = appointments.filter(
+    (a) => a.date === selectedDate && a.status === 'Arrived'
+  );
+  const inChairPatients = appointments.filter(
+    (a) => a.date === selectedDate && a.status === 'In-Chair'
+  );
+
+  const getElapsedMinutes = (arrivedAt?: string) => {
+    if (!arrivedAt) return 0;
+    const diffMs = now - new Date(arrivedAt).getTime();
+    return Math.max(0, Math.floor(diffMs / 60000));
+  };
 
   const timeSlots = [
     '08:00',
@@ -81,10 +123,21 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         return <Badge variant="success" dot>Completed</Badge>;
       case 'In-Chair':
         return <Badge variant="danger" dot>In-Chair</Badge>;
+      case 'Arrived':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+            In Waiting Room
+          </span>
+        );
       case 'Scheduled':
         return <Badge variant="info" dot>Scheduled</Badge>;
       case 'Delayed':
-        return <Badge variant="warning" dot className="bg-amber-100 text-amber-900 border-amber-300">Delayed</Badge>;
+        return (
+          <Badge variant="warning" dot className="bg-amber-100 text-amber-900 border-amber-300">
+            Delayed
+          </Badge>
+        );
       case 'Cancelled':
         return <Badge variant="neutral">Cancelled</Badge>;
       case 'No-Show':
@@ -103,7 +156,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           <div>
             <h1 className="text-xl font-bold text-slate-900">Appointment Scheduling Engine</h1>
             <p className="text-xs text-slate-500">
-              Operatory chair assignment, doctor mapping, and patient flow.
+              Operatory chair assignment, live reception queue, and patient reminders.
             </p>
           </div>
         </div>
@@ -153,6 +206,21 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
               Chair Columns
             </button>
             <button
+              onClick={() => setViewMode('queue')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                viewMode === 'queue'
+                  ? 'bg-white text-primary-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>Waiting Room</span>
+              {waitingPatients.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-amber-500 text-white animate-pulse">
+                  {waitingPatients.length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setViewMode('day')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 viewMode === 'day'
@@ -174,6 +242,18 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
             </button>
           </div>
 
+          {/* Manage Operatory Chairs */}
+          <button
+            onClick={() => setIsManageChairsOpen(true)}
+            className="flex items-center space-x-1.5 bg-surface-100 hover:bg-surface-200 text-slate-700 px-3.5 py-2 rounded-2xl text-xs font-bold border border-border transition-all shadow-xs"
+            title="Configure Operatory Suites & Scale Cap"
+          >
+            <Armchair size={14} className="text-primary-600" />
+            <span>
+              Operatories ({activeChairs.length}/{currentTenant?.subscription?.chairLimit || 6})
+            </span>
+          </button>
+
           {/* Book Action */}
           <button
             onClick={onBookAppointment}
@@ -185,44 +265,57 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         </div>
       </div>
 
-      {/* Filter Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mr-1">
-          <Filter size={13} /> Filter Chair:
-        </span>
-        {['All', ...chairs].map((chairName) => (
-          <button
-            key={chairName}
-            onClick={() => setSelectedChair(chairName)}
-            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-              selectedChair === chairName
-                ? 'bg-primary-600 text-white shadow-sm'
-                : 'bg-white border border-border text-slate-600 hover:bg-surface-100'
-            }`}
-          >
-            {chairName}
-          </button>
-        ))}
-      </div>
+      {/* Filter Chips (when in Chairs or List view) */}
+      {viewMode !== 'queue' && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mr-1">
+            <Filter size={13} /> Filter Chair:
+          </span>
+          {['All', ...chairNames].map((chairName) => (
+            <button
+              key={chairName}
+              onClick={() => setSelectedChair(chairName)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                selectedChair === chairName
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-white border border-border text-slate-600 hover:bg-surface-100'
+              }`}
+            >
+              {chairName}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* View 1: Operatory Chair Columns View */}
+      {/* VIEW 1: Operatory Chair Columns View */}
       {viewMode === 'chairs' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {chairs
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {chairNames
             .filter((c) => selectedChair === 'All' || selectedChair === c)
             .map((chair) => {
               const chairApts = appointments
                 .filter((a) => a.date === selectedDate && a.operatoryChair === chair)
                 .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
+              const isOccupied = chairApts.some((a) => a.status === 'In-Chair');
+
               return (
                 <div
                   key={chair}
-                  className="bg-white rounded-3xl border border-border p-5 shadow-elevation-1 flex flex-col min-h-[550px]"
+                  className={`bg-white rounded-3xl border p-5 shadow-elevation-1 flex flex-col min-h-[550px] transition-all ${
+                    isOccupied ? 'border-primary-300 ring-1 ring-primary-100' : 'border-border'
+                  }`}
                 >
+                  {/* Chair Header */}
                   <div className="flex items-center justify-between pb-3 mb-4 border-b border-border">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-2 rounded-xl bg-primary-50 text-primary-600">
+                    <div className="flex items-center space-x-2.5">
+                      <div
+                        className={`p-2 rounded-xl ${
+                          isOccupied
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-primary-50 text-primary-600'
+                        }`}
+                      >
                         <Armchair size={18} />
                       </div>
                       <div>
@@ -231,6 +324,19 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                           {chairApts.length} appointments scheduled
                         </span>
                       </div>
+                    </div>
+                    <div>
+                      {isOccupied ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
+                          IN-CHAIR
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          VACANT
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -245,10 +351,16 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                       chairApts.map((apt) => (
                         <div
                           key={apt.id}
-                          className="bg-surface-50 hover:bg-primary-50/40 p-4 rounded-2xl border border-slate-200/80 transition-all space-y-2.5 shadow-sm"
+                          className={`p-4 rounded-2xl border transition-all space-y-2.5 shadow-sm ${
+                            apt.status === 'In-Chair'
+                              ? 'bg-rose-50/50 border-rose-200'
+                              : apt.status === 'Arrived'
+                              ? 'bg-amber-50/60 border-amber-200'
+                              : 'bg-surface-50 hover:bg-primary-50/40 border-slate-200/80'
+                          }`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <span className="font-mono text-xs font-extrabold text-primary-700 bg-white px-2.5 py-0.5 rounded-lg border border-primary-100 shadow-sm">
+                            <span className="font-mono text-xs font-extrabold text-primary-700 bg-white px-2.5 py-0.5 rounded-lg border border-primary-100 shadow-xs">
                               {apt.startTime} - {apt.endTime}
                             </span>
                             {getStatusBadge(apt.status)}
@@ -261,45 +373,66 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                             >
                               {apt.patientName}
                             </button>
-                            <p className="text-xs text-slate-600 mt-0.5">
-                              <span className="font-mono font-semibold text-slate-500">[{apt.procedureCode}]</span>{' '}
-                              {apt.serviceName}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
-                            <span className="truncate">Dr: {apt.doctorName}</span>
-                            <span className="font-bold text-slate-800">{formatINR(apt.fee)}</span>
-                          </div>
-
-                          {/* Status changer buttons & delete action */}
-                          <div className="flex items-center justify-between gap-1 pt-1">
-                            <div className="flex items-center flex-wrap gap-1">
-                              {(['Scheduled', 'In-Chair', 'Delayed', 'Completed'] as AppointmentStatus[]).map(
-                                (st) => (
-                                  <button
-                                    key={st}
-                                    onClick={() => updateAppointmentStatus(apt.id, st)}
-                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all ${
-                                      apt.status === st
-                                        ? st === 'Delayed'
-                                          ? 'bg-amber-600 text-white border-amber-600'
-                                          : 'bg-slate-900 text-white border-slate-900'
-                                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                                    }`}
-                                  >
-                                    {st}
-                                  </button>
-                                )
-                              )}
+                            <div className="text-xs text-slate-600 font-medium flex items-center gap-1 mt-0.5">
+                              <Stethoscope size={13} className="text-slate-400" />
+                              <span className="font-mono font-bold text-slate-500 mr-1">
+                                [{apt.procedureCode}]
+                              </span>
+                              <span>{apt.serviceName}</span>
                             </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                            <div className="flex items-center space-x-1.5 text-slate-500 text-[11px]">
+                              <User size={13} />
+                              <span>{apt.doctorName}</span>
+                            </div>
+                            <div className="font-bold text-slate-900">{formatINR(apt.fee)}</div>
+                          </div>
+
+                          {/* Quick Workflow Action Bar */}
+                          <div className="pt-1.5 flex items-center justify-between border-t border-slate-200/40">
+                            {/* WhatsApp reminder */}
                             <button
-                              onClick={() => setAppointmentToDelete(apt)}
-                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex-shrink-0"
-                              title="Delete Appointment"
+                              type="button"
+                              onClick={() => setReminderAppointment(apt)}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg transition-colors"
+                              title="Send WhatsApp / SMS Confirmation"
                             >
-                              <Trash2 size={14} />
+                              <MessageSquare size={12} />
+                              <span>WhatsApp</span>
                             </button>
+
+                            {/* Check In / Seating quick buttons */}
+                            {apt.status === 'Scheduled' && (
+                              <button
+                                type="button"
+                                onClick={() => markPatientArrived(apt.id)}
+                                className="text-[11px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg transition-colors"
+                              >
+                                Mark Arrived
+                              </button>
+                            )}
+
+                            {apt.status === 'Arrived' && (
+                              <button
+                                type="button"
+                                onClick={() => assignChairAndSeat(apt.id, apt.operatoryChair)}
+                                className="text-[11px] font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded-lg transition-colors"
+                              >
+                                Seat in Chair
+                              </button>
+                            )}
+
+                            {apt.status === 'In-Chair' && (
+                              <button
+                                type="button"
+                                onClick={() => updateAppointmentStatus(apt.id, 'Completed')}
+                                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg transition-colors"
+                              >
+                                Complete Procedure
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))
@@ -311,44 +444,319 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         </div>
       )}
 
-      {/* View 2: Hourly Timeline */}
-      {viewMode === 'day' && (
-        <div className="bg-white rounded-3xl border border-border p-6 shadow-elevation-1 overflow-x-auto">
-          <div className="min-w-[700px] divide-y divide-border">
-            {timeSlots.map((time) => {
-              const slots = appointments.filter(
-                (a) => a.date === selectedDate && a.startTime.startsWith(time.split(':')[0])
-              );
-              return (
-                <div key={time} className="py-3 flex items-start space-x-6">
-                  <div className="w-16 flex-shrink-0 font-mono text-xs font-bold text-slate-500 pt-1">
-                    {time}
-                  </div>
-                  <div className="flex-1 min-h-[44px] flex items-center flex-wrap gap-3">
-                    {slots.length === 0 ? (
-                      <span className="text-xs text-slate-300 italic">No appointments</span>
-                    ) : (
-                      slots.map((apt) => (
-                        <div
-                          key={apt.id}
-                          className="bg-primary-50 border border-primary-200 px-3 py-2 rounded-xl text-xs flex items-center space-x-3 shadow-sm"
-                        >
-                          <span className="font-mono font-bold text-primary-800">
-                            {apt.startTime}
-                          </span>
-                          <span
+      {/* VIEW 2: Patient Waiting Room Queue */}
+      {viewMode === 'queue' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Waiting Room Metric Header */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-3xl border border-border shadow-elevation-1 flex items-center space-x-4">
+              <div className="p-3 bg-amber-100 text-amber-700 rounded-2xl">
+                <Users size={24} />
+              </div>
+              <div>
+                <div className="text-2xl font-extrabold text-slate-900">
+                  {waitingPatients.length}
+                </div>
+                <div className="text-xs font-semibold text-slate-500">
+                  Patients Currently in Reception
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-border shadow-elevation-1 flex items-center space-x-4">
+              <div className="p-3 bg-rose-100 text-rose-700 rounded-2xl">
+                <Armchair size={24} />
+              </div>
+              <div>
+                <div className="text-2xl font-extrabold text-slate-900">
+                  {inChairPatients.length}
+                </div>
+                <div className="text-xs font-semibold text-slate-500">
+                  Patients Currently In-Chair
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-border shadow-elevation-1 flex items-center space-x-4">
+              <div className="p-3 bg-emerald-100 text-emerald-700 rounded-2xl">
+                <CheckCircle size={24} />
+              </div>
+              <div>
+                <div className="text-2xl font-extrabold text-slate-900">
+                  {chairNames.length - inChairPatients.length} / {chairNames.length}
+                </div>
+                <div className="text-xs font-semibold text-slate-500">
+                  Operatory Chairs Available Now
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Overdue Warning Notification if any wait > 15m */}
+          {waitingPatients.some((a) => getElapsedMinutes(a.arrivedAt) > 15) && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-3xl flex items-center gap-3 text-xs text-rose-900 font-medium">
+              <AlertTriangle size={18} className="text-rose-600 flex-shrink-0 animate-bounce" />
+              <div>
+                <strong className="font-bold">Wait Time Alert:</strong> One or more patients have
+                been waiting in the reception for over 15 minutes. Please assign an available
+                operatory chair to minimize clinic wait times.
+              </div>
+            </div>
+          )}
+
+          {/* Waiting Room Queue Cards */}
+          <div className="bg-white rounded-3xl border border-border p-6 shadow-elevation-1 space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Live Reception & Arrival Queue ({selectedDate})
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Real-time elapsed wait timers and 1-click operatory chair seating
+                </p>
+              </div>
+            </div>
+
+            {waitingPatients.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                <Users size={32} className="mx-auto mb-2 text-slate-300" />
+                No patients currently waiting in reception for {selectedDate}.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {waitingPatients.map((apt) => {
+                  const elapsed = getElapsedMinutes(apt.arrivedAt);
+                  const isOverdue = elapsed > 15;
+
+                  return (
+                    <div
+                      key={apt.id}
+                      className={`p-5 rounded-2xl border transition-all space-y-3 ${
+                        isOverdue
+                          ? 'bg-rose-50/70 border-rose-300 ring-2 ring-rose-200 shadow-sm'
+                          : 'bg-amber-50/40 border-amber-200 shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <button
                             onClick={() => onSelectPatient(apt.patientId)}
-                            className="font-bold text-slate-900 hover:underline cursor-pointer"
+                            className="font-bold text-base text-slate-900 hover:text-primary-700 text-left transition-colors"
                           >
                             {apt.patientName}
+                          </button>
+                          <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                            <Phone size={11} />
+                            <span>{apt.patientPhone}</span>
+                          </div>
+                        </div>
+
+                        {/* Live Elapsed Timer Badge */}
+                        <div
+                          className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
+                            isOverdue
+                              ? 'bg-rose-600 text-white animate-pulse shadow-sm'
+                              : 'bg-amber-200/90 text-amber-900'
+                          }`}
+                        >
+                          <Clock size={13} />
+                          <span>{elapsed}m waiting</span>
+                          {isOverdue && <span className="text-[10px] font-black">(! &gt;15m)</span>}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-white/80 p-3 rounded-xl border border-slate-200/60">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-semibold block uppercase">
+                            Procedure
                           </span>
-                          <span className="text-slate-600 truncate max-w-[200px]">
+                          <span className="font-bold text-slate-800 truncate block">
                             {apt.serviceName}
                           </span>
-                          <span className="text-slate-500 text-[11px] bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                            {apt.operatoryChair}
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-semibold block uppercase">
+                            Assigned Doctor
                           </span>
-                          {getStatusBadge(apt.status)}
+                          <span className="font-bold text-slate-800 truncate block">
+                            {apt.doctorName}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-semibold block uppercase">
+                            Scheduled Time
+                          </span>
+                          <span className="font-mono font-bold text-slate-700">
+                            {apt.startTime} - {apt.endTime}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-semibold block uppercase">
+                            Planned Chair
+                          </span>
+                          <span className="font-semibold text-slate-700">{apt.operatoryChair}</span>
+                        </div>
+                      </div>
+
+                      {/* 1-Click Chair Seating Bar */}
+                      <div className="pt-2 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setReminderAppointment(apt)}
+                          className="flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                        >
+                          <MessageSquare size={13} />
+                          <span>Send WhatsApp</span>
+                        </button>
+
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[11px] font-bold text-slate-600">Seat in:</label>
+                          <select
+                            defaultValue={apt.operatoryChair}
+                            id={`chair-select-${apt.id}`}
+                            className="bg-white border border-slate-300 rounded-xl px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-primary-500"
+                          >
+                            {chairNames.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const sel = document.getElementById(
+                                `chair-select-${apt.id}`
+                              ) as HTMLSelectElement;
+                              const chosenChair = sel ? sel.value : apt.operatoryChair;
+                              assignChairAndSeat(apt.id, chosenChair);
+                            }}
+                            className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1"
+                          >
+                            <Armchair size={13} />
+                            <span>Seat Patient</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Upcoming Scheduled Patients (Ready for Reception Check-In) */}
+            <div className="pt-6 border-t border-border">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+                Scheduled Appointments Ready for Check-In ({selectedDate})
+              </h4>
+              <div className="divide-y divide-border border border-border rounded-2xl overflow-hidden">
+                {filteredAppointments
+                  .filter((a) => a.status === 'Scheduled')
+                  .map((apt) => (
+                    <div
+                      key={apt.id}
+                      className="p-3.5 bg-surface-50 hover:bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors text-xs"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="font-mono font-bold text-primary-700 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                          {apt.startTime}
+                        </span>
+                        <div>
+                          <button
+                            onClick={() => onSelectPatient(apt.patientId)}
+                            className="font-bold text-slate-900 hover:underline"
+                          >
+                            {apt.patientName}
+                          </button>
+                          <span className="text-slate-500 ml-2">
+                            • {apt.serviceName} ({apt.operatoryChair})
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setReminderAppointment(apt)}
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg border border-slate-200"
+                          title="WhatsApp Reminder"
+                        >
+                          <MessageSquare size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => markPatientArrived(apt.id)}
+                          className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-xs transition-all"
+                        >
+                          Check In Patient
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 3: Hourly Timeline View */}
+      {viewMode === 'day' && (
+        <div className="bg-white rounded-3xl border border-border p-6 shadow-elevation-1 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <h3 className="text-sm font-bold text-slate-900">
+              Operatory Timeline Schedule ({selectedDate})
+            </h3>
+            <span className="text-xs text-slate-500">
+              {filteredAppointments.length} Total Bookings
+            </span>
+          </div>
+
+          <div className="divide-y divide-border">
+            {timeSlots.map((slot) => {
+              const slotApts = filteredAppointments.filter((a) => a.startTime.startsWith(slot));
+
+              return (
+                <div key={slot} className="py-3 flex items-start gap-4">
+                  <span className="font-mono font-bold text-xs text-slate-500 w-16 pt-1">
+                    {slot}
+                  </span>
+                  <div className="flex-1 space-y-2">
+                    {slotApts.length === 0 ? (
+                      <span className="text-xs text-slate-300 italic block py-1">Vacant Operatory</span>
+                    ) : (
+                      slotApts.map((apt) => (
+                        <div
+                          key={apt.id}
+                          className="p-3 bg-surface-50 hover:bg-primary-50/40 rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono font-bold text-primary-700">
+                              {apt.startTime} - {apt.endTime}
+                            </span>
+                            <span
+                              onClick={() => onSelectPatient(apt.patientId)}
+                              className="font-bold text-slate-900 hover:underline cursor-pointer"
+                            >
+                              {apt.patientName}
+                            </span>
+                            <span className="text-slate-600 truncate max-w-[200px]">
+                              {apt.serviceName}
+                            </span>
+                            <span className="text-slate-500 text-[11px] bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                              {apt.operatoryChair}
+                            </span>
+                            {getStatusBadge(apt.status)}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setReminderAppointment(apt)}
+                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                              title="WhatsApp Reminder"
+                            >
+                              <MessageSquare size={14} />
+                            </button>
+                            <span className="font-bold text-slate-900">{formatINR(apt.fee)}</span>
+                          </div>
                         </div>
                       ))
                     )}
@@ -360,7 +768,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         </div>
       )}
 
-      {/* View 3: List View */}
+      {/* VIEW 4: List View */}
       {viewMode === 'list' && (
         <div className="bg-white rounded-3xl border border-border p-6 shadow-elevation-1 overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -403,9 +811,10 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                       onChange={(e) =>
                         updateAppointmentStatus(apt.id, e.target.value as AppointmentStatus)
                       }
-                      className="bg-surface-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-700"
+                      className="bg-surface-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-700 cursor-pointer"
                     >
                       <option value="Scheduled">Scheduled</option>
+                      <option value="Arrived">Arrived (Waiting)</option>
                       <option value="In-Chair">In-Chair</option>
                       <option value="Delayed">Delayed</option>
                       <option value="Completed">Completed</option>
@@ -414,13 +823,22 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
                     </select>
                   </td>
                   <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => setAppointmentToDelete(apt)}
-                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                      title="Delete Appointment"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center justify-end space-x-2">
+                      <button
+                        onClick={() => setReminderAppointment(apt)}
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        title="Send WhatsApp / SMS Reminder"
+                      >
+                        <MessageSquare size={15} />
+                      </button>
+                      <button
+                        onClick={() => setAppointmentToDelete(apt)}
+                        className="p-1.5 text-slate-400 hover:text-clinical-danger hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete Appointment"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -429,51 +847,55 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
         </div>
       )}
 
-      {/* Delete Appointment Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {appointmentToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-border space-y-4">
-            <div className="flex items-center space-x-3 text-rose-600">
-              <div className="p-2.5 bg-rose-50 rounded-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-border space-y-4">
+            <div className="flex items-center space-x-3 text-amber-600">
+              <div className="p-2.5 bg-amber-50 rounded-2xl">
                 <AlertTriangle size={24} />
               </div>
-              <h3 className="text-base font-extrabold text-slate-900">Confirm Appointment Deletion</h3>
+              <h3 className="text-base font-bold text-slate-900">Cancel Appointment?</h3>
             </div>
-
             <p className="text-xs text-slate-600 leading-relaxed">
-              Are you sure you want to permanently delete the appointment for{' '}
+              Are you sure you want to remove the booking for{' '}
               <strong className="text-slate-900">{appointmentToDelete.patientName}</strong> on{' '}
-              <strong className="text-slate-900">{appointmentToDelete.date} ({appointmentToDelete.startTime})</strong>?
-              This action cannot be undone.
+              <strong className="text-slate-900">{appointmentToDelete.date}</strong> at{' '}
+              <strong className="text-slate-900">{appointmentToDelete.startTime}</strong>?
             </p>
-
-            <div className="p-3 bg-surface-50 rounded-xl border border-slate-200 text-xs space-y-1">
-              <div className="text-slate-500">Service: <span className="font-semibold text-slate-800">{appointmentToDelete.serviceName}</span></div>
-              <div className="text-slate-500">Chair: <span className="font-semibold text-slate-800">{appointmentToDelete.operatoryChair}</span></div>
-              <div className="text-slate-500">Doctor: <span className="font-semibold text-slate-800">{appointmentToDelete.doctorName}</span></div>
-            </div>
-
-            <div className="flex items-center justify-end space-x-3 pt-2">
+            <div className="flex items-center justify-end space-x-2 pt-2">
               <button
                 onClick={() => setAppointmentToDelete(null)}
-                className="px-4 py-2 text-xs font-bold text-slate-700 hover:bg-surface-100 rounded-xl transition-all"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-surface-100 transition-colors"
               >
-                Cancel
+                Keep Appointment
               </button>
               <button
                 onClick={() => {
                   deleteAppointment(appointmentToDelete.id);
                   setAppointmentToDelete(null);
                 }}
-                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-clinical-danger hover:bg-rose-700 text-white transition-colors"
               >
-                <Trash2 size={13} />
-                <span>Delete Appointment</span>
+                Confirm Delete
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Operatory Chairs Configuration Modal */}
+      <ManageChairsModal
+        isOpen={isManageChairsOpen}
+        onClose={() => setIsManageChairsOpen(false)}
+      />
+
+      {/* WhatsApp & SMS Reminder Modal */}
+      <AppointmentReminderModal
+        isOpen={!!reminderAppointment}
+        onClose={() => setReminderAppointment(null)}
+        appointment={reminderAppointment}
+      />
     </div>
   );
 };

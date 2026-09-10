@@ -18,8 +18,10 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   initialDate,
   initialPatientId,
 }) => {
-  const { patients, services, addAppointment, checkAppointmentConflict } = useData();
+  const { patients, services, addAppointment, checkAppointmentConflict, operatoryChairs } = useData();
   const { allUsers, currentTenant } = useAuth();
+
+  const activeChairs = operatoryChairs.filter((c) => c.isActive);
 
   const doctors = allUsers.filter(
     (u) =>
@@ -32,7 +34,9 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
   const [doctorId, setDoctorId] = useState(doctors[0]?.id || '');
   const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('10:00');
-  const [operatoryChair, setOperatoryChair] = useState<OperatoryChair>('Chair 1 - Hygiene');
+  const [operatoryChair, setOperatoryChair] = useState<string>(
+    activeChairs[0]?.name || 'Chair 1 - Hygiene'
+  );
   const [notes, setNotes] = useState('');
   const [allowOverride, setAllowOverride] = useState(false);
 
@@ -214,12 +218,14 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
               </label>
               <select
                 value={operatoryChair}
-                onChange={(e) => setOperatoryChair(e.target.value as OperatoryChair)}
-                className="w-full bg-surface-50 border border-border rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-primary-600"
+                onChange={(e) => setOperatoryChair(e.target.value)}
+                className="w-full bg-surface-50 border border-border rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-primary-600 cursor-pointer"
               >
-                <option value="Chair 1 - Hygiene">Chair 1 - Hygiene</option>
-                <option value="Chair 2 - Surgery">Chair 2 - Surgery</option>
-                <option value="Chair 3 - General">Chair 3 - General</option>
+                {activeChairs.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name} ({c.chairType})
+                  </option>
+                ))}
               </select>
             </div>
           </div>
