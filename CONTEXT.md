@@ -255,6 +255,53 @@ injection (parameterised throughout); stored XSS (React auto-escapes, no
 `dangerouslySetInnerHTML`); CSRF (Bearer header, not cookies — not applicable);
 `password_hash`/`salt` never in any response; Doctor Admin cannot reach `SUPER_ADMIN`.
 
+### XSS hardening (2026-09-10)
+- **CSP** — a Vite build plugin (`vite.config.ts`) bakes a strict
+  `Content-Security-Policy` `<meta>` into `dist/index.html`: `script-src 'self'` (no
+  inline script, no inline `on*` handlers, no `eval`), `connect-src` locked to the API
+  origin (from `VITE_API_URL`) so injected JS **cannot exfiltrate the token**,
+  `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`. Not applied to the
+  dev server (HMR needs inline/eval). `vercel.json` ships the same CSP as a real header
+  plus HSTS / X-Frame-Options / Referrer-Policy / Permissions-Policy on the SPA document
+  — **edit `<YOUR-RENDER-API>` in `vercel.json` to the real Render URL before deploy.**
+- Confirmed: built `index.html` has zero inline `<script>`; `src/` has no
+  `dangerouslySetInnerHTML` / `innerHTML` / `eval` / `document.write` / `location.hash`
+  parsing. React auto-escaping + CSP is the layered defense.
+- Backend: 1 MB request-body cap (413); `/health` no longer opens a DB connection
+  (`/health/ready` does, for monitoring) so a flood can't drain the pool.
+
+### Remaining attack surface (beyond Vercel/Render config)
+Ranked; none are open holes, they're the next hardening tier.
+
+1. **No global brute-force / credential-stuffing cap** across many accounts from one
+   source. In-app defense = per-email limit + 12-char min + generic errors + timing
+   equalized. Real fix: Cloudflare / a WAF in front of Vercel+Render.
+2. **JWT not revocable for its 12 h life.** A stolen token works until `exp`.
+   Kill switch today = suspend/delete the user (takes effect next request). Better:
+   a `token_version` int on `users`, embedded in the JWT and checked on load; bump it
+   on password change / "log out everywhere". Also consider a 1 h access token + refresh.
+3. **No MFA.** For healthcare-adjacent data, TOTP on `SUPER_ADMIN` / `DOCTOR_ADMIN`
+   accounts is a genuine gap.
+4. **No password-reset flow.** Admins hand out temp passwords out-of-band (Slack/email)
+   — a weak link. Needs an email-token reset.
+5. **No per-user rate limit on authed writes.** A leaked/compromised token could spam
+   `POST /patients|/invoices|/clinical-notes`, bloating that one tenant + shared Neon
+   storage. Add a token-bucket per user id on write verbs.
+6. **`audit_logs` append-only is code-only.** Still need `REVOKE UPDATE, DELETE ON
+   audit_logs FROM <app_role>` on a low-privilege DB role (deploy-time DB task).
+7. **No automated backups.** Neon free PITR ≈ 24 h. A malicious admin hard-deletes a
+   lot of their tenant's data (there's no soft-delete). Add nightly `pg_dump` → object
+   storage + soft-delete (`deleted_at`) for patients/invoices/appointments.
+8. **No dependency-vuln scanning.** Add `pip-audit` + `npm audit` (or Dependabot) to CI.
+9. **`BOOTSTRAP_SUPERADMIN_PASSWORD` left in Render env** after seeding is readable by
+   anyone with dashboard access — clear it (README says so; make it a checklist item).
+10. **Rotate the Neon password** — it was pasted in chat.
+11. Third-party Google Fonts (CSP restricts the origins, low risk) — optionally
+    self-host the woff2 files to drop the dependency + the privacy leak.
+12. **Chunked-body DoS** — the 1 MB cap is by `Content-Length`; a chunked request with
+    no length header isn't caught. Rely on Render/Cloudflare body limits, or read the
+    stream with a hard cap.
+
 ### Residual risk (accepted / needs infra)
 - No global brute-force cap across many accounts from one source — needs a WAF /
   Cloudflare in front (Render's proxy makes an IP-based cap unreliable). Per-account
