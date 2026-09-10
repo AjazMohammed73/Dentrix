@@ -20,12 +20,15 @@ def verify_password(password: str, password_hash: str) -> bool:
     return _pwd.verify(password, password_hash)
 
 
-def create_access_token(*, user_id: str, role: str, tenant_id: str | None) -> str:
+def create_access_token(
+    *, user_id: str, role: str, tenant_id: str | None, token_version: int
+) -> str:
     settings = get_settings()
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "typ": "access",
+        "tv": token_version,
         "role": role,
         "tenant_id": str(tenant_id) if tenant_id else None,
         "iat": now,
@@ -34,12 +37,13 @@ def create_access_token(*, user_id: str, role: str, tenant_id: str | None) -> st
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def create_refresh_token(*, user_id: str) -> str:
+def create_refresh_token(*, user_id: str, token_version: int) -> str:
     settings = get_settings()
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "typ": "refresh",
+        "tv": token_version,
         "iat": now,
         "exp": now + timedelta(days=settings.refresh_token_expire_days),
     }
@@ -62,10 +66,10 @@ if __name__ == "__main__":
     assert verify_password("s3cret-pw", h)
     assert not verify_password("wrong-pw", h)
 
-    tok = create_access_token(user_id="u1", role="STAFF", tenant_id=None)
+    tok = create_access_token(user_id="u1", role="STAFF", tenant_id=None, token_version=1)
     data = decode_token(tok)
-    assert data["sub"] == "u1" and data["role"] == "STAFF" and data["typ"] == "access"
+    assert data["sub"] == "u1" and data["role"] == "STAFF" and data["typ"] == "access" and data["tv"] == 1
 
-    rt = create_refresh_token(user_id="u1")
+    rt = create_refresh_token(user_id="u1", token_version=1)
     assert decode_token(rt)["typ"] == "refresh"
     print("security self-check ok")

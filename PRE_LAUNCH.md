@@ -1,16 +1,20 @@
 # Must Change Before Going Live
 
-> **Status (2026-09-10):** most of this is now done. A real FastAPI + Postgres
-> backend exists (`backend/`), the frontend runs entirely on it, auth is real
-> (JWT + Argon2id), RBAC + tenant isolation are enforced server-side, there's an
-> append-only audit log, `/auth/login` is rate-limited, CSV exports are
-> injection-safe, demo accounts and unbacked HIPAA/RLS claims are gone. See
-> `CONTEXT.md` for the full picture.
+> **Status (2026-09-10, round 2):** the code side is done. Real FastAPI + Postgres
+> backend, frontend runs entirely on it, auth is real (JWT access + HttpOnly refresh
+> cookie + CSRF, Argon2id, `token_version` revocation, 60-min access token,
+> `logout-all`), RBAC + tenant isolation server-side, append-only audit log now
+> enforced by a **DB trigger** (no deploy `REVOKE` needed), login rate-limited
+> (per-email + per-IP), per-user write quota, 1 MB body cap, strict CSP, pagination,
+> soft-delete on appointments + invoices, CSV injection-safe, CI workflow. Demo
+> accounts and unbacked HIPAA/RLS claims are gone. See `CONTEXT.md` for detail.
 >
-> **Still open:** run the audit-table `REVOKE` on a low-priv DB role at deploy;
-> money is stored as whole-INR integers (fine for INR, revisit for sub-rupee);
-> `Date.now()`/count-based ID + invoice-number schemes (low risk at this scale);
-> soft-delete instead of hard delete; pagination on long lists.
+> **Still open — all deployment / infra, no code left:** rotate the Neon password
+> (pasted in chat); clear `BOOTSTRAP_SUPERADMIN_PASSWORD` from Render env after first
+> boot; set `ENV=production`; replace `<YOUR-RENDER-API>` in `vercel.json`; pick an
+> email provider for password reset; add MFA/TOTP; nightly `pg_dump` backups;
+> put Cloudflare / a WAF in front for global brute-force protection; Sentry.
+> Money stays whole-INR integers (fine for INR).
 
 Original checklist below — items marked here are the ones that still need doing.
 
@@ -70,10 +74,10 @@ Original checklist below — items marked here are the ones that still need doin
       domains). Not `*`. `allow_credentials=True` only with an explicit origin list.
 - [ ] **Rate limiting**: at least on `/login` and write endpoints
       (`slowapi` or a reverse-proxy rule). Lockout / backoff on repeated login fail.
-- [ ] **Audit log server-side**: write to an append-only table (no `UPDATE`/
-      `DELETE` grant for the app role; or a trigger that blocks them). The current
-      client-side `logAuditEvent` is trivially forgeable. Log the real
-      authenticated user and source IP, not client-supplied values.
+- [x] **Audit log server-side**: `record_audit` writes into the caller's transaction
+      with the authenticated user + `X-Forwarded-For`. A `BEFORE UPDATE OR DELETE`
+      trigger (`dentrix_block_audit_mutation`, migration `b1f2a3c4d5e6`) makes the
+      table append-only at the DB — no separate low-priv role / `REVOKE` needed.
 - [ ] **Secrets from env only**: DB URL, JWT signing key, any API keys. Nothing in
       the repo. `.env` in `.gitignore` (confirm), provide `.env.example`.
 - [ ] **DB migrations**: Alembic. No `create_all` in production.
@@ -159,5 +163,5 @@ Original checklist below — items marked here are the ones that still need doin
 - [ ] Optimistic-UI rollback when an API write fails.
 - [ ] Real global search (the `TopHeader` search input is decorative).
 - [ ] Insurance claim workflow — `Invoice.insuranceClaim` type exists but no UI.
-- [ ] Soft-delete (`deleted_at`) instead of hard `DELETE` for patients / invoices /
-      appointments, for audit and recovery.
+- [x] Soft-delete (`deleted_at`) for invoices + appointments (2026-09-10). Patients
+      still hard-delete — add `deleted_at` there too if it becomes a concern.

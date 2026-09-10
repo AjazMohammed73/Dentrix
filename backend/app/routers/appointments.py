@@ -1,5 +1,6 @@
 import uuid
 from datetime import date as date_type
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -55,6 +56,7 @@ def _find_conflicts(
             Appointment.tenant_id == tenant_id,
             Appointment.date == day,
             Appointment.status.notin_(_INACTIVE),
+            Appointment.deleted_at.is_(None),
         )
     ).all()
     ns, ne = _to_minutes(start), _to_minutes(end)
@@ -73,9 +75,26 @@ def _find_conflicts(
 
 def _get_owned(db: Session, user: User, appointment_id: uuid.UUID) -> Appointment:
     appt = db.get(Appointment, appointment_id)
-    if appt is None or (user.role != "SUPER_ADMIN" and appt.tenant_id != user.tenant_id):
+    if (
+        appt is None
+        or appt.deleted_at is not None
+        or (user.role != "SUPER_ADMIN" and appt.tenant_id != user.tenant_id)
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Appointment not found")
     return appt
+
+
+def _void_unpaid_invoice(db: Session, appt: Appointment) -> None:
+    """Cancel/delete an appointment => soft-delete its still-unpaid auto-invoice and
+    reverse the patient balance so A/R doesn't stay inflated."""
+    inv = db.scalar(
+        select(Invoice).where(
+            Invoice.appointment_id == appt.id, Invoice.deleted_at.is_(None)
+        )
+    )
+    if inv is not None and inv.amount_paid == 0 and inv.status != "Paid":
+        apply_patient_balance(db, inv.patient_id, -inv.balance)
+        inv.deleted_at = datetime.now(timezone.utc)
 
 
 @router.get("", response_model=list[AppointmentOut])
@@ -88,7 +107,9 @@ def list_appointments(
     date_from: Annotated[date_type | None, Query(alias="from")] = None,
     date_to: Annotated[date_type | None, Query(alias="to")] = None,
 ) -> list[Appointment]:
-    stmt = scoped(select(Appointment), Appointment.tenant_id, user)
+    stmt = scoped(select(Appointment), Appointment.tenant_id, user).where(
+        Appointment.deleted_at.is_(None)
+    )
     if date is not None:
         stmt = stmt.where(Appointment.date == date)
     if date_from is not None:
@@ -225,10 +246,7 @@ def update_appointment(
     # Cancelling/no-showing an appointment voids its still-unpaid auto-invoice so the
     # clinic's A/R and the patient balance don't stay inflated.
     if was_active and appt.status in _INACTIVE:
-        inv = db.scalar(select(Invoice).where(Invoice.appointment_id == appt.id))
-        if inv is not None and inv.amount_paid == 0 and inv.status != "Paid":
-            apply_patient_balance(db, inv.patient_id, -inv.balance)
-            db.delete(inv)
+        _void_unpaid_invoice(db, appt)
 
     record_audit(
         db, request, user, "APPOINTMENT_STATUS_CHANGED", "Appointment", appt.id,
@@ -244,9 +262,10 @@ def delete_appointment(
     appointment_id: uuid.UUID, request: Request, user: ManageAppointments, db: DbSession
 ) -> None:
     appt = _get_owned(db, user, appointment_id)
+    _void_unpaid_invoice(db, appt)
+    appt.deleted_at = datetime.now(timezone.utc)  # soft delete — keep the audit trail intact
     record_audit(
         db, request, user, "APPOINTMENT_DELETED", "Appointment", appt.id,
         f"Cancelled {appt.service_name} for {appt.patient_name} on {appt.date}",
     )
-    db.delete(appt)  # the auto-invoice stays; its appointment_id becomes NULL
     db.commit()

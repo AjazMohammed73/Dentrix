@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import get_settings
+from .ratelimit import hit
+from .security import decode_token
 from .routers import (
     appointments,
     audit,
@@ -101,6 +103,30 @@ async def security_headers(request: Request, call_next):
     resp.headers["Referrer-Policy"] = "no-referrer"
     resp.headers["Cache-Control"] = "no-store"
     return resp
+
+
+_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def write_quota(request: Request, call_next):
+    """Per-user cap on state-changing calls: a compromised token can't hammer the DB.
+    Auth endpoints have their own (stricter) limiter. Bad/missing token => skip here,
+    the endpoint's own auth returns 401."""
+    if request.method in _WRITE_METHODS and not request.url.path.startswith("/auth/"):
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            try:
+                sub = decode_token(auth_header[7:]).get("sub")
+            except Exception:
+                sub = None
+            if sub and not hit(identity=sub, key="writes", limit=240, window_seconds=60):
+                return JSONResponse(
+                    {"detail": "Too many requests. Slow down."},
+                    status_code=429,
+                    headers={"Retry-After": "60"},
+                )
+    return await call_next(request)
 
 
 @app.exception_handler(RequestValidationError)

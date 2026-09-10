@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,3 +40,4 @@ class Appointment(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="Scheduled")
     notes: Mapped[str] = mapped_column(Text, default="")
     fee: Mapped[int] = mapped_column(Integer, default=0)  # whole INR
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

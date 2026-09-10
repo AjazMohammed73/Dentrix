@@ -156,10 +156,12 @@ def assign_doctor_admin(
     ):
         if current.id != target.id:
             current.role = "STAFF"
+            current.token_version += 1  # demoted => kill their outstanding tokens
 
     target.tenant_id = tenant.id
     target.role = "DOCTOR_ADMIN"
     target.permissions = dict(FULL_PERMISSIONS)
+    target.token_version += 1  # role/tenant changed => re-auth
     if not any(hint in target.title for hint in _DOCTOR_TITLE_HINTS):
         target.title = f"{target.title} (Doctor Admin)".strip()
     tenant.doctor_admin_name = target.name

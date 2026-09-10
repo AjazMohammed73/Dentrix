@@ -36,6 +36,8 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None or user.status != "active":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account not active")
+    if payload.get("tv") != user.token_version:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session has been revoked")
     if user.tenant_id is not None:
         tenant = db.get(Tenant, user.tenant_id)
         if tenant is None or tenant.status != "active":

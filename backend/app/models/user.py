@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey, String
+from sqlalchemy import Date, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,5 +34,7 @@ class User(Base, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(String(20), default="active")  # active | inactive | suspended
     joined_at: Mapped[date] = mapped_column(Date, default=date.today)
+    # bumped on password / role / status / permission change => outstanding tokens die
+    token_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     tenant: Mapped[Tenant | None] = relationship(back_populates="users")

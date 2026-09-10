@@ -3,7 +3,7 @@
 Working notes for anyone (human or AI) picking this up. Read this + `PRE_LAUNCH.md`
 + `backend/README.md` and you're caught up.
 
-_Last updated: 2026-09-09_
+_Last updated: 2026-09-10 (security hardening round 2)_
 
 ---
 
@@ -35,8 +35,9 @@ Render Postgres ($7) once past a few live clinics.
 ## Backend — decisions locked in
 
 - **Sync SQLAlchemy 2.0** + psycopg3. Not async (no benefit at this scale, more complexity).
-- **JWT access token only** (`Authorization: Bearer`), ~12 h expiry, no refresh token yet.
-  Argon2id password hashing (`pwdlib`).
+- **JWT auth**: in-memory access token (`Authorization: Bearer`, 60 min) + HttpOnly
+  `dentrix_refresh` cookie (30 d, `POST /auth/refresh` with double-submit CSRF). Both
+  carry `tv` (token_version) for instant revocation. Argon2id hashing (`pwdlib`).
 - **Alembic** from day one. No `create_all`.
 - **Per-domain files**: `models/<entity>.py`, `schemas/<entity>.py`, `routers/<entity>.py`.
 - **Wire format is camelCase** (`schemas/common.py::CamelModel`) to match the frontend
@@ -288,55 +289,68 @@ injection (parameterised throughout); stored XSS (React auto-escapes, no
 - **Body cap** — pure-ASGI middleware: 1 MB, honours `Content-Length` and caps the actual
   chunked stream, drains the rest so the client gets a clean 413.
 
-### Remaining attack surface (beyond Vercel/Render config)
-Ranked; none are open holes, they're the next hardening tier.
+## Security hardening — round 2 (2026-09-10)
 
-1. **No global brute-force / credential-stuffing cap** across many accounts from one
-   source. In-app defense = per-email limit + 12-char min + generic errors + timing
-   equalized. Real fix: Cloudflare / a WAF in front of Vercel+Render.
-2. **Access token not revocable for its 12 h life.** The *persisted* credential is now
-   an HttpOnly refresh cookie (XSS-safe), but a leaked in-memory access token still works
-   until `exp`. Kill switch = suspend/delete the user (next request). Better: a
-   `token_version` int on `users` in both tokens, checked on load, bumped on password
-   change / "log out everywhere"; and drop the access token to ~15 min (refresh covers UX).
-3. **No MFA.** For healthcare-adjacent data, TOTP on `SUPER_ADMIN` / `DOCTOR_ADMIN`
-   accounts is a genuine gap.
-4. **No password-reset flow.** Admins hand out temp passwords out-of-band (Slack/email)
-   — a weak link. Needs an email-token reset.
-5. **No per-user rate limit on authed writes.** A leaked/compromised token could spam
-   `POST /patients|/invoices|/clinical-notes`, bloating that one tenant + shared Neon
-   storage. Add a token-bucket per user id on write verbs.
-6. **`audit_logs` append-only is code-only.** Still need `REVOKE UPDATE, DELETE ON
-   audit_logs FROM <app_role>` on a low-privilege DB role (deploy-time DB task).
-7. **No automated backups.** Neon free PITR ≈ 24 h. A malicious admin hard-deletes a
-   lot of their tenant's data (there's no soft-delete). Add nightly `pg_dump` → object
-   storage + soft-delete (`deleted_at`) for patients/invoices/appointments.
-8. **No dependency-vuln scanning.** Add `pip-audit` + `npm audit` (or Dependabot) to CI.
-9. **`BOOTSTRAP_SUPERADMIN_PASSWORD` left in Render env** after seeding is readable by
-   anyone with dashboard access — clear it (README says so; make it a checklist item).
-10. **Rotate the Neon password** — it was pasted in chat.
-11. Third-party Google Fonts (CSP restricts the origins, low risk) — optionally
-    self-host the woff2 files to drop the dependency + the privacy leak.
+Finished the "next hardening tier". Migration `b1f2a3c4d5e6_security_hardening`
+(token_version + deleted_at columns + audit-immutability trigger). `python -m
+app.ratelimit` self-check added; E2E suite extended (token revocation, logout-all,
+soft-delete).
 
-### Residual risk (accepted / needs infra)
-- No global brute-force cap across many accounts from one source — needs a WAF /
-  Cloudflare in front (Render's proxy makes an IP-based cap unreliable). Per-account
-  limit + 12-char min + generic errors are the in-app defense.
-- JWT can't be revoked before its 12 h expiry (suspend/delete the user cuts access;
-  role/permission/tenant changes take effect immediately).
-- Token in `sessionStorage` — XSS would expose it, but the XSS surface is minimal
-  (React, no dangerous sinks). `HttpOnly` cookie would trade this for CSRF.
-- `/health` opens a DB connection per hit — a flood could exhaust the pool (recovers).
+- **Instant token revocation** — `users.token_version` (int, `server_default '1'`).
+  Both access + refresh tokens carry `tv`; `get_current_user` and `/auth/refresh`
+  401 (`"Session has been revoked"`) if it no longer matches. Bumped on any
+  role / status / permissions change (`users.update_user`), on `assign-doctor-admin`
+  (target + stepped-down old admins), and by the new **`POST /auth/logout-all`**
+  (self-service "sign out of all devices", CSRF-guarded, audited `SECURITY_LOGOUT`).
+- **Access-token lifetime 12 h → 60 min** (`config.access_token_expire_minutes`);
+  the refresh cookie covers UX, so a leaked access token dies fast now.
+- **Per-user write quota** — `main.py` middleware: 240 state-changing
+  (`POST/PUT/PATCH/DELETE`, non-`/auth/`) requests per user id per 60 s → 429 +
+  `Retry-After`. Bad/absent token → skipped (the endpoint's own auth answers).
+  Counter logic covered by `python -m app.ratelimit`.
+- **Login: added a second per-IP layer** (50 failures / 5 min) on top of the
+  per-email one (10 / 5 min). Only failures count; still `X-Forwarded-For`-proof.
+- **`audit_logs` is now immutable at the DB** — a `BEFORE UPDATE OR DELETE` trigger
+  (`dentrix_block_audit_mutation`) raises `audit_logs is append-only`. Survives
+  `DROP TABLE` on downgrade (row triggers don't fire on DDL). Replaces the
+  deploy-time `REVOKE` task — no separate DB role needed.
+- **Soft-delete** — `appointments.deleted_at` / `invoices.deleted_at`. `DELETE`
+  now stamps the column; list queries, `_get_owned` (404), and the conflict finder
+  all filter `deleted_at IS NULL`. Cancelling an appointment or deleting an
+  invoice reverses the patient balance and soft-voids the linked unpaid invoice.
+  Data survives a malicious admin's bulk delete; audit trail stays intact.
+- **CI** — `.github/workflows/ci.yml`: frontend `tsc --noEmit` + `vite build` +
+  `npm audit`; backend `python -m app.security` + `import app.main` + `pip-audit`.
+
+### Still open (need product / infra decisions — NOT code)
+- **MFA / TOTP** on `SUPER_ADMIN` / `DOCTOR_ADMIN` — needs enrolment UI + recovery codes.
+- **Self-service password reset** — needs an email provider chosen (currently admins
+  hand out temp passwords out-of-band).
+- **Automated backups** — Neon free PITR ≈ 24 h; add nightly `pg_dump` → object storage.
+- **Global brute-force / credential-stuffing cap** across many accounts from one
+  source — needs Cloudflare / a WAF in front (Render's proxy makes IP caps unreliable).
+- Third-party Google Fonts (CSP pins the origins; low risk) — optionally self-host woff2.
+
+### Deploy-time tasks (see `PRE_LAUNCH.md`)
+- Rotate the Neon password (pasted in chat).
+- Clear `BOOTSTRAP_SUPERADMIN_PASSWORD` from Render env after first boot.
+- Set `ENV=production`; replace `<YOUR-RENDER-API>` in `vercel.json` with the real URL.
+
+### Residual risk (accepted)
+- A leaked access token still works until `exp` (now ≤ 60 min) unless the user is
+  suspended / `logout-all` is called / a role-perm-status change bumps `tv`.
+- Rate limiter `_hits` dict is per-process (resets on deploy). One Render instance is fine.
+- `/health` opens no DB connection; `/health/ready` does (for monitoring).
 
 ## Known limitations (low priority, noted not fixed)
-- No pagination — `GET /patients|appointments|invoices|users` return whole tables
-  (`audit-logs` is capped at 200). Fine to ~18 months per clinic; add `?from=/?to=` on
-  appointments first.
-- JWT has no per-token revocation (12 h). Suspend/delete the user to cut access —
-  role/permission/tenant changes already take effect immediately (the row is re-read).
+- Pagination is offset-based (`?limit=`/`?offset=`, max 1000) with no server-side `?q`
+  search — the SPA pulls `limit=1000` and filters client-side. Add a paged UI + server
+  search past ~1000 patients/clinic.
 - Rate limiter + its `_hits` dict are per-process (reset on deploy). One Render instance is fine.
 - Doctor Admin can't self-edit their profile (no UI for it either).
 - `SystemHealth` cards are static placeholders.
+- Remote Neon round-trip from this dev box is ~2 s/query (SSL + `pool_pre_ping`) — the
+  full E2E suite takes many minutes locally. Not representative of Render↔Neon in-region.
 
 ## Gotchas / conventions
 

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -24,7 +24,11 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 def _get_owned(db: Session, user: User, invoice_id: uuid.UUID) -> Invoice:
     inv = db.get(Invoice, invoice_id)
-    if inv is None or (user.role != "SUPER_ADMIN" and inv.tenant_id != user.tenant_id):
+    if (
+        inv is None
+        or inv.deleted_at is not None
+        or (user.role != "SUPER_ADMIN" and inv.tenant_id != user.tenant_id)
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Invoice not found")
     return inv
 
@@ -53,6 +57,7 @@ def _record_payment(
 def list_invoices(user: ViewRevenue, db: DbSession, page: Pagination) -> list[Invoice]:
     stmt = (
         scoped(select(Invoice), Invoice.tenant_id, user)
+        .where(Invoice.deleted_at.is_(None))
         .options(selectinload(Invoice.installments))
         .order_by(Invoice.date.desc())
         .limit(page.limit)
@@ -166,5 +171,5 @@ def delete_invoice(
         db, request, user, "INVOICE_DELETED", "Invoice", inv.id,
         f"Deleted invoice {inv.invoice_number} ({inv.patient_name})",
     )
-    db.delete(inv)
+    inv.deleted_at = datetime.now(timezone.utc)  # soft delete — number stays reserved, trail intact
     db.commit()

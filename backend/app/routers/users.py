@@ -112,6 +112,8 @@ def update_user(
 ) -> User:
     target = _get_target(db, caller, user_id)
     data = body.model_dump(exclude_unset=True)
+    # any of these landing => outstanding access/refresh tokens for the target must die
+    revoke = any(data.get(f) is not None for f in ("role", "status", "permissions"))
 
     new_role = data.get("role")
     if new_role is not None:
@@ -144,6 +146,9 @@ def update_user(
             **target.permissions,
             **_sanitize_permissions(data["permissions"], caller),
         }
+
+    if revoke:
+        target.token_version += 1
 
     record_audit(
         db, request, caller, "USER_UPDATED", "User", target.id,

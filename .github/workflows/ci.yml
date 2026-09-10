@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          VITE_API_URL: https://api.example.com
+      - run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r backend/requirements.txt
+      - name: security self-check
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://u:p@localhost/x
+          JWT_SECRET: ci-selfcheck-secret
+        run: python -m app.security
+      - name: import app
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://u:p@localhost/x
+          JWT_SECRET: ci-selfcheck-secret
+        run: python -c "import app.main"
+      - run: pip install pip-audit && pip-audit -r backend/requirements.txt
+        continue-on-error: true

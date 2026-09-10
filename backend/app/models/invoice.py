@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,6 +38,7 @@ class Invoice(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="Pending")  # Paid | Pending | Overdue
     payment_method: Mapped[str | None] = mapped_column(String(40), nullable=True)
     insurance_claim: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     installments: Mapped[list[PaymentInstallment]] = relationship(
         back_populates="invoice",

@@ -35,11 +35,15 @@ _COOKIE_MAX_AGE = _settings.refresh_token_expire_days * 86400
 _SAMESITE = "none" if _IS_PROD else "lax"
 
 
-def _set_auth_cookies(response: Response, user_id: str) -> None:
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _set_auth_cookies(response: Response, user: User) -> None:
     csrf = secrets.token_urlsafe(32)
     response.set_cookie(
         REFRESH_COOKIE,
-        create_refresh_token(user_id=user_id),
+        create_refresh_token(user_id=str(user.id), token_version=user.token_version),
         max_age=_COOKIE_MAX_AGE,
         httponly=True,
         secure=_IS_PROD,
@@ -85,6 +89,7 @@ def _issue(user: User) -> str:
         user_id=str(user.id),
         role=user.role,
         tenant_id=str(user.tenant_id) if user.tenant_id else None,
+        token_version=user.token_version,
     )
 
 
@@ -96,13 +101,18 @@ def login(
     db: Annotated[Session, Depends(get_db)],
 ) -> TokenResponse:
     email = body.email.strip().lower()
-    check_rate_limit(identity=email, key="login", limit=10, window_seconds=300)
+    ip = _client_ip(request)
+    # Two layers: per-account (credential stuffing) and per-IP (a scripted attacker).
+    # Only failed attempts are recorded, so a whole NAT'd office isn't punished.
+    check_rate_limit(identity=email, key="login-email", limit=10, window_seconds=300)
+    check_rate_limit(identity=ip, key="login-ip", limit=50, window_seconds=300)
 
     user = db.scalar(select(User).where(func.lower(User.email) == email))
     # Always verify (dummy hash if no such user) so timing doesn't leak existence.
     password_ok = verify_password(body.password, user.password_hash if user else DUMMY_HASH)
     if user is None or not password_ok:
-        record_attempt(identity=email, key="login", window_seconds=300)
+        record_attempt(identity=email, key="login-email", window_seconds=300)
+        record_attempt(identity=ip, key="login-ip", window_seconds=300)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     if user.status != "active":
         raise HTTPException(
@@ -113,7 +123,7 @@ def login(
     record_audit(db, request, user, "SECURITY_LOGIN", "Security", user.id, "Signed in")
     db.commit()
 
-    _set_auth_cookies(response, str(user.id))
+    _set_auth_cookies(response, user)
     return TokenResponse(access_token=_issue(user), user=UserOut.model_validate(user))
 
 
@@ -136,13 +146,33 @@ def refresh(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired")
 
     user = _load_active_user(db, user_id)
-    _set_auth_cookies(response, str(user.id))  # rotation
+    if payload.get("tv") != user.token_version:
+        _clear_auth_cookies(response)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session has been revoked")
+
+    _set_auth_cookies(response, user)  # rotation
     return TokenResponse(access_token=_issue(user), user=UserOut.model_validate(user))
 
 
 @router.post("/logout")
 def logout(request: Request, response: Response) -> dict:
     _require_csrf(request)
+    _clear_auth_cookies(response)
+    return {"ok": True}
+
+
+@router.post("/logout-all")
+def logout_all(
+    request: Request,
+    response: Response,
+    user: CurrentUser,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Invalidate every outstanding token for the current user (all devices)."""
+    _require_csrf(request)
+    user.token_version += 1
+    record_audit(db, request, user, "SECURITY_LOGOUT", "Security", user.id, "Signed out of all devices")
+    db.commit()
     _clear_auth_cookies(response)
     return {"ok": True}
 
