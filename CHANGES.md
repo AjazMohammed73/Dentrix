@@ -258,6 +258,49 @@ of teeth (32 permanent plus 20 primary). Over that returns `422`.
 
 ---
 
+## Part 5 — Audit-log retention job
+
+**Why.** The `audit_logs` table only ever grows. On a small database (Neon's free
+0.5 GB tier) it is the first thing to fill the quota — roughly four to five months for
+fifteen clinics if never trimmed. We want to keep the audit history without letting it
+run the database out of space.
+
+**What was added.**
+
+- **`python -m app.retention`** — a command (not a background service; run it from a
+  Render Cron Job or a scheduled GitHub Action). It:
+  1. finds every `audit_logs` row older than `AUDIT_RETENTION_DAYS` (default 90);
+  2. writes them to a gzipped JSON-Lines file
+     (`AUDIT_ARCHIVE_DIR/audit-before-<date>-<timestamp>.jsonl.gz`);
+  3. if `AUDIT_ARCHIVE_S3_BUCKET` is set, uploads that file to S3 or Cloudflare R2
+     (set `AUDIT_ARCHIVE_S3_ENDPOINT` for R2; AWS-style credentials come from the
+     standard environment variables);
+  4. deletes the archived rows from the table.
+  - `--dry-run` reports what would happen and still writes the archive file, but does
+    not delete anything.
+  - `--selfcheck` runs a serialization check with no database (used in CI).
+
+- **Migration `d8e9f0a1b2c3`** updates the append-only trigger so a `DELETE` is
+  permitted **only** when the current transaction has run
+  `SET LOCAL "dentrix.audit_retention" = 'on'`. The retention command is the only
+  thing that sets that flag. `UPDATE` is still blocked unconditionally, and a plain
+  `DELETE` from the API or from ad-hoc SQL is still refused with
+  `audit_logs is append-only`.
+
+- Config: `AUDIT_RETENTION_DAYS` (90), `AUDIT_ARCHIVE_DIR` (`audit_archive`),
+  `AUDIT_ARCHIVE_S3_BUCKET`, `AUDIT_ARCHIVE_S3_ENDPOINT`. `boto3` was added to
+  `requirements.txt` but is imported lazily — it is only loaded when an archive
+  bucket is configured.
+
+**Effect.** The database keeps a rolling 90-day window of audit rows; everything older
+is preserved as a compressed file (locally and/or in object storage) and removed from
+Postgres. Verified end to end: old rows are archived and deleted, recent rows are kept,
+and a normal `DELETE` on the table is still rejected.
+
+**If you decide you don't want it:** stop scheduling the command and run
+`alembic downgrade -1` once to restore the strict trigger. The archived files are
+plain gzipped JSON and can be re-imported at any time.
+
 ## Status — answers to the open questions
 
 **Is the work done?** Yes, for everything that is code. The backend is feature-complete

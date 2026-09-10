@@ -18,12 +18,16 @@ app/
   main.py             app factory + CORS + router wiring
   seed.py             one-shot bootstrap Super Admin from env
   audit.py           record_audit() — appends an audit row to the caller's transaction
+  retention.py       archive + prune old audit_logs rows (run on a schedule)
+  ratelimit.py       in-memory sliding-window limiter (login + per-user write quota)
   models/             base · tenant · user · patient · service · appointment · invoice
-                      · clinical_note · audit_log
+                      · clinical_note · audit_log · prescription · radiograph
+                      · perio_chart · treatment_plan · operatory_chair
   schemas/            common (CamelModel + Literals) · auth · user · tenant · patient · service
-                      · appointment · invoice · clinical_note · audit
+                      · appointment · invoice · clinical_note · audit + the clinical-suite ones
   routers/            health · auth · tenants · users · patients · services · appointments
-                      · invoices · clinical_notes · audit
+                      · invoices · clinical_notes · audit · prescriptions · radiographs
+                      · perio_charts · treatment_plans · operatory_chairs
 alembic/              migrations, wired to app settings in env.py
 ```
 
@@ -105,9 +109,27 @@ balance in the same transaction. Clinical notes and payment installments are app
 - Env vars: `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS` (your Vercel domain), `ENV=production`.
   Set `BOOTSTRAP_SUPERADMIN_*` once, run `python -m app.seed` from a shell, then clear the password var.
 - Put the Render service and the Neon project in the **same region**.
-- **Audit immutability**: `audit_logs` is append-only in code. For a hard guarantee,
-  connect the app as a low-privilege role and run once:
-  `REVOKE UPDATE, DELETE ON audit_logs FROM <app_role>;`
+- **Audit immutability**: enforced by a DB trigger (`dentrix_block_audit_mutation`,
+  migration `b1f2a3c4d5e6`) that blocks every `UPDATE`/`DELETE` on `audit_logs`. No
+  manual `REVOKE` needed.
+
+## Audit-log retention
+
+`audit_logs` is the fastest-growing table. Run the retention command on a schedule
+(Render **Cron Job**, or a scheduled GitHub Action) — never in the API process:
+
+    python -m app.retention            # archive rows older than AUDIT_RETENTION_DAYS, then delete them
+    python -m app.retention --dry-run  # report only
+
+It writes the old rows to `AUDIT_ARCHIVE_DIR/audit-before-<date>-<ts>.jsonl.gz`, then —
+if `AUDIT_ARCHIVE_S3_BUCKET` is set — uploads that file to S3 / Cloudflare R2 (set
+`AUDIT_ARCHIVE_S3_ENDPOINT` for R2; AWS creds come from the standard env vars), then
+deletes the archived rows. The delete is permitted only inside this command's
+transaction (`SET LOCAL "dentrix.audit_retention" = 'on'`); the append-only trigger
+still blocks everything else.
+
+Env: `AUDIT_RETENTION_DAYS` (default 90), `AUDIT_ARCHIVE_DIR` (default `audit_archive`),
+`AUDIT_ARCHIVE_S3_BUCKET`, `AUDIT_ARCHIVE_S3_ENDPOINT`. Suggested schedule: weekly.
 
 ## Next
 

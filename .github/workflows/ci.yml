@@ -36,6 +36,14 @@ jobs:
           DATABASE_URL: postgresql://u:p@localhost/x
           JWT_SECRET: ci-selfcheck-secret
         run: python -m app.security
+      - name: ratelimit + retention self-checks
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://u:p@localhost/x
+          JWT_SECRET: ci-selfcheck-secret
+        run: |
+          python -m app.ratelimit
+          python -m app.retention --selfcheck
       - name: import app
         working-directory: backend
         env:

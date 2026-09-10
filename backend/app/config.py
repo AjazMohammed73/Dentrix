@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     bootstrap_superadmin_password: str | None = None
     bootstrap_superadmin_name: str = "Platform Admin"
 
+    # Audit-log retention (see app/retention.py — run on a schedule, not in-process).
+    audit_retention_days: int = 90
+    audit_archive_dir: str = "audit_archive"
+    audit_archive_s3_bucket: str | None = None
+    audit_archive_s3_endpoint: str | None = None  # set for Cloudflare R2 / non-AWS S3
+
     @property
     def sqlalchemy_url(self) -> str:
         """SQLAlchemy wants the psycopg3 dialect prefix; Neon hands out plain postgresql://."""
