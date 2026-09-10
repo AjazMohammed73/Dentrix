@@ -57,7 +57,7 @@ On later model changes: `alembic revision --autogenerate -m "..."` then `alembic
 ## Run
 
 ```bash
-uvicorn app.main:app --reload --port 8001       # docs at http://127.0.0.1:8001/docs
+uvicorn app.main:app --reload --port 8001 --no-server-header       # docs at http://127.0.0.1:8001/docs
 ```
 
 Local port is **8001** (8000 is used by another project on this machine). The frontend
@@ -94,7 +94,7 @@ balance in the same transaction. Clinical notes and payment installments are app
 - **Web Service**, root directory `backend/`, plan **Starter** (free spins down).
 - Build: `pip install -r requirements.txt`
 - Pre-deploy: `alembic upgrade head`
-- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-server-header --proxy-headers`
 - Health check path: `/health`
 - Env vars: `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS` (your Vercel domain), `ENV=production`.
   Set `BOOTSTRAP_SUPERADMIN_*` once, run `python -m app.seed` from a shell, then clear the password var.
