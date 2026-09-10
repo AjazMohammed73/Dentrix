@@ -10,6 +10,13 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-def health(db: Annotated[Session, Depends(get_db)]) -> dict:
-    db.execute(text("SELECT 1"))
+def health() -> dict:
+    """Liveness — no DB call, so a flood can't exhaust the connection pool."""
     return {"status": "ok"}
+
+
+@router.get("/health/ready")
+def readiness(db: Annotated[Session, Depends(get_db)]) -> dict:
+    """Readiness — pings the DB. Use this for monitoring/alerting, not Render's check."""
+    db.execute(text("SELECT 1"))
+    return {"status": "ready"}

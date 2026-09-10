@@ -38,8 +38,15 @@ app.add_middleware(
 )
 
 
+_MAX_BODY_BYTES = 1_000_000  # 1 MB — generous for JSON; rejects oversized payloads early
+
+
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
+async def security_and_limits(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit() and int(content_length) > _MAX_BODY_BYTES:
+        return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+
     resp = await call_next(request)
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
