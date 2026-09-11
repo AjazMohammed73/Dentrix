@@ -104,7 +104,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
           {/* Nav Links */}
           <nav className="hidden lg:flex items-center space-x-8 text-xs font-bold text-slate-600">
             <a href="#features" className="hover:text-primary-600 transition-colors">Features</a>
-            <a href="#odontogram" className="hover:text-primary-600 transition-colors">3D Odontogram</a>
             <a href="#pricing" className="hover:text-primary-600 transition-colors">Pricing & Plans</a>
             <a href="#reviews" className="hover:text-primary-600 transition-colors">Doctor Reviews</a>
             <a href="#faq" className="hover:text-primary-600 transition-colors">FAQ</a>
@@ -176,7 +175,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
 
             {/* Subheading */}
             <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              The all-in-one dental practice administration platform. Built for modern dental clinics to orchestrate operatory chairs, chart with 3D odontograms, automate CDT fee schedules, and streamline multi-tenant clinical operations.
+              The all-in-one dental practice administration platform. Built for modern dental clinics to orchestrate operatory chairs, chart with digital odontograms, automate CDT fee schedules, and streamline multi-tenant clinical operations.
             </p>
 
             {/* Dual CTAs */}
@@ -678,7 +677,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
               ))}
             </div>
             <p className="text-xs text-slate-600 leading-relaxed italic">
-              "Dentrix transformed how we run Apex Dental. The 3D odontogram and quick chair status updates allow our hygienists and assistants to sync without running across hallways."
+              "Dentrix transformed how we run Apex Dental. The digital odontogram and quick chair status updates allow our hygienists and assistants to sync without running across hallways."
             </p>
             <div className="pt-2 border-t border-border flex items-center space-x-3">
               <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-800 font-bold flex items-center justify-center text-xs">
@@ -698,15 +697,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
               ))}
             </div>
             <p className="text-xs text-slate-600 leading-relaxed italic">
-              "The ability to scope staff permissions so front desk staff can book visits without accessing confidential revenue reports is exactly what a modern dental clinic needs."
+              "Multi-tenant billing and chair-scheduling paid for itself in week one. Our front desk saves over 2 hours every evening generating daily production invoices."
             </p>
             <div className="pt-2 border-t border-border flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-xs">
-                JM
+              <div className="w-10 h-10 rounded-full bg-sky-100 text-sky-800 font-bold flex items-center justify-center text-xs">
+                RK
               </div>
               <div>
-                <span className="font-bold text-xs text-slate-900 block">Dr. Julian Martinez, DMD</span>
-                <span className="text-[11px] text-slate-500">Owner, Radiant Smile Clinic</span>
+                <span className="font-bold text-xs text-slate-900 block">Dr. Rajesh Kumar, MDS</span>
+                <span className="text-[11px] text-slate-500">Director, City Smiles Dental Center</span>
               </div>
             </div>
           </div>
@@ -718,15 +717,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
               ))}
             </div>
             <p className="text-xs text-slate-600 leading-relaxed italic">
-              "The Super Admin console makes multi-clinic management trivial. Provisioning a new clinic with assigned Doctor Admins and customized CDT fee schedules takes less than 60 seconds."
+              "The ability to simulate roles, audit all records, and manage clinic subscriptions seamlessly makes Dentrix our go-to solution for regional clinic management."
             </p>
             <div className="pt-2 border-t border-border flex items-center space-x-3">
               <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
-                AP
+                MP
               </div>
               <div>
-                <span className="font-bold text-xs text-slate-900 block">Arthur Pendelton</span>
-                <span className="text-[11px] text-slate-500">Super Admin, Cloud Network</span>
+                <span className="font-bold text-xs text-slate-900 block">Maya Patel</span>
+                <span className="text-[11px] text-slate-500">Chief Administrator, Metro Dental Care</span>
               </div>
             </div>
           </div>
@@ -777,7 +776,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
             Start Managing Your Practice in Minutes.
           </h2>
           <p className="text-xs sm:text-sm text-primary-100 max-w-xl mx-auto">
-            Experience the real-time chair calendar, 3D tooth odontogram, and multi-tenant cloud console right now.
+            Experience the real-time chair calendar, digital tooth odontogram, and multi-tenant cloud console right now.
           </p>
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
