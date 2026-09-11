@@ -5,14 +5,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..dependencies import require_audit_access
+from ..dependencies import require_super_admin
 from ..models import AuditLog, User
 from ..schemas.audit import AuditLogOut
 
 router = APIRouter(prefix="/audit-logs", tags=["audit"])
 
 DbSession = Annotated[Session, Depends(get_db)]
-AuditViewer = Annotated[User, Depends(require_audit_access)]
+AuditViewer = Annotated[User, Depends(require_super_admin)]
 
 
 @router.get("", response_model=list[AuditLogOut])
@@ -24,8 +24,6 @@ def list_audit_logs(
     offset: int = Query(0, ge=0),
 ) -> list[AuditLog]:
     stmt = select(AuditLog)
-    if user.role != "SUPER_ADMIN":
-        stmt = stmt.where(AuditLog.tenant_id == user.tenant_id)
     if q:
         # escape LIKE metacharacters so a query of "%" / "_" can't force a full scan
         safe = q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

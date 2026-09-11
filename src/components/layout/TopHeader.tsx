@@ -5,7 +5,6 @@ import {
   Plus,
   Building,
   ShieldCheck,
-  Globe,
   Sparkles,
   LogOut,
   FileText,
@@ -19,7 +18,6 @@ import { CommandPalette } from '../common/CommandPalette';
 interface TopHeaderProps {
   onQuickBook: () => void;
   onOpenCreateInvoice?: () => void;
-  onViewLandingPage?: () => void;
   onSignOut?: () => void;
   onSelectPatient?: (patientId: string) => void;
   onNavigate?: (route: any) => void;
@@ -30,7 +28,6 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({
   onQuickBook,
   onOpenCreateInvoice,
-  onViewLandingPage,
   onSignOut,
   onSelectPatient = () => {},
   onNavigate = () => {},
@@ -40,7 +37,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const { currentUser, currentTenant, logout } = useAuth();
 
   const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
-  const canViewAudit = currentUser.role === 'DOCTOR_ADMIN' || currentUser.role === 'SUPER_ADMIN';
+  const canViewAudit = currentUser.role === 'SUPER_ADMIN';
   const canManageBackup = currentUser.role === 'DOCTOR_ADMIN' || currentUser.role === 'SUPER_ADMIN';
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -115,18 +112,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           >
             <Plus size={16} />
             <span className="hidden sm:inline">Book Appointment</span>
-          </button>
-        )}
-
-        {/* Landing Page */}
-        {onViewLandingPage && (
-          <button
-            onClick={onViewLandingPage}
-            className="flex items-center space-x-1.5 bg-surface-100 hover:bg-surface-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold border border-border transition-colors"
-            title="View Public Landing Page"
-          >
-            <Globe size={14} className="text-primary-600" />
-            <span className="hidden sm:inline">Landing Page</span>
           </button>
         )}
 
@@ -209,7 +194,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         onNavigate={onNavigate}
         onQuickBook={onQuickBook}
         onOpenCreateInvoice={onOpenCreateInvoice}
-        onOpenAudit={() => setIsAuditModalOpen(true)}
+        onOpenAudit={canViewAudit ? () => setIsAuditModalOpen(true) : undefined}
       />
     </header>
   );

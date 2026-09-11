@@ -70,14 +70,6 @@ def require_super_admin(user: CurrentUser) -> User:
     return user
 
 
-def require_audit_access(user: CurrentUser) -> User:
-    if user.role not in _ADMIN_ROLES:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "Audit trail is restricted to administrators"
-        )
-    return user
-
-
 def require_billing_access(user: CurrentUser) -> User:
     """Front-desk billing: raising an invoice is a receptionist task even when the
     revenue *reports* screen is restricted. Revenue analytics stays behind

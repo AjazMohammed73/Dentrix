@@ -168,7 +168,6 @@ const AppContent: React.FC = () => {
           <TopHeader
             onQuickBook={handleQuickBook}
             onOpenCreateInvoice={() => handleOpenCreateInvoice()}
-            onViewLandingPage={() => setShowLandingPage(true)}
             onSignOut={handleSignOut}
           />
 
