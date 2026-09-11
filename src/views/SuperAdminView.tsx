@@ -18,6 +18,7 @@ import {
   Sparkles,
   Calendar,
   AlertTriangle,
+  KeyRound,
 } from 'lucide-react';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
@@ -39,11 +40,22 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
     currentUser,
     toggleTenantStatus,
     updateUser,
+    resetStaffPassword,
     deleteUserGlobal,
     assignDoctorAdmin,
     updateTenantSubscription,
   } = useAuth();
   const { systemHealth, allServices, toggleServiceActive } = useData();
+
+  const handleResetPassword = (userId: string, name: string) => {
+    const password = window.prompt(`Set a new password for ${name} (min 12 characters):`);
+    if (!password) return;
+    if (password.length < 12) {
+      window.alert('Password must be at least 12 characters.');
+      return;
+    }
+    void resetStaffPassword(userId, password);
+  };
 
   if (currentUser.role !== 'SUPER_ADMIN') {
     return (
@@ -490,6 +502,14 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
                           }`}
                         >
                           {user.status === 'active' ? 'Suspend' : 'Reactivate'}
+                        </button>
+
+                        <button
+                          onClick={() => handleResetPassword(user.id, user.name)}
+                          className="text-[11px] font-bold p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-surface-100 transition-all inline-flex items-center"
+                          title="Reset password"
+                        >
+                          <KeyRound size={13} />
                         </button>
 
                         <button

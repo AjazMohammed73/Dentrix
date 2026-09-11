@@ -40,6 +40,7 @@ interface AuthContextType {
   toggleTenantStatus: (tenantId: string) => Promise<void>;
   addStaffMember: (input: StaffInput) => Promise<void>;
   toggleStaffStatus: (userId: string) => Promise<void>;
+  resetStaffPassword: (userId: string, password: string) => Promise<void>;
   deleteStaffMember: (userId: string) => Promise<void>;
   updateUser: (userId: string, data: Partial<User>) => Promise<void>;
   deleteUserGlobal: (userId: string) => Promise<void>;
@@ -161,6 +162,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await loadUsers(currentUser);
     });
 
+  const resetStaffPassword = (userId: string, password: string) =>
+    guard(async () => {
+      await api(`/users/${userId}`, { method: 'PATCH', body: { password } });
+    });
+
   const deleteStaffMember = (userId: string) =>
     guard(async () => {
       await api(`/users/${userId}`, { method: 'DELETE' });
@@ -227,6 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toggleTenantStatus,
         addStaffMember,
         toggleStaffStatus,
+        resetStaffPassword,
         deleteStaffMember,
         updateUser,
         deleteUserGlobal,

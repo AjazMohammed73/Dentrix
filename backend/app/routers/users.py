@@ -113,7 +113,12 @@ def update_user(
     target = _get_target(db, caller, user_id)
     data = body.model_dump(exclude_unset=True)
     # any of these landing => outstanding access/refresh tokens for the target must die
-    revoke = any(data.get(f) is not None for f in ("role", "status", "permissions"))
+    revoke = any(data.get(f) is not None for f in ("role", "status", "permissions", "password"))
+
+    if data.get("password") is not None:
+        if caller.role != "SUPER_ADMIN":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a Super Admin can reset passwords")
+        target.password_hash = hash_password(data["password"])
 
     new_role = data.get("role")
     if new_role is not None:

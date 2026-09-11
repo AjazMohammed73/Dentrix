@@ -34,6 +34,7 @@ class UserUpdate(CamelModel):
     role: Role | None = None          # Super Admin only
     status: UserStatus | None = None
     permissions: dict | None = None   # merged into the existing permissions, not replaced
+    password: str | None = Field(default=None, min_length=12, max_length=200)
 
 
 class UserOut(CamelModel):
