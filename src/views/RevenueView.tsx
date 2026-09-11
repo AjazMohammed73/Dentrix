@@ -51,6 +51,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
   const {
     invoices,
     appointments,
+    patients,
     markInvoicePaid,
     addInvoicePayment,
     deleteInvoice,
@@ -1153,7 +1154,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                       >
                         <Printer size={15} />
                       </button>
-                      {/* WhatsApp Share Button */}
+                      {/* WhatsApp Share Button — opens the patient's own chat directly */}
                       <button
                         onClick={() => {
                           const msg =
@@ -1167,10 +1168,16 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                             `*Balance Due:* ${formatINR(inv.balance)}\n` +
                             `*Status:* ${inv.status.toUpperCase()}\n` +
                             `Thank you! • _Powered by Axiotronicx.Inc_`;
-                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+                          const rawPhone = patients.find((p) => p.id === inv.patientId)?.phone || '';
+                          const digits = rawPhone.replace(/\D/g, '');
+                          // 10-digit local numbers are assumed India (+91); anything already
+                          // carrying a country code (11+ digits) is passed through as-is.
+                          const phone = digits.length === 10 ? `91${digits}` : digits;
+                          const phoneParam = phone ? `phone=${phone}&` : '';
+                          window.open(`https://api.whatsapp.com/send?${phoneParam}text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
                         }}
                         className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Share via WhatsApp"
+                        title="Send Bill via WhatsApp"
                       >
                         <Share2 size={15} />
                       </button>

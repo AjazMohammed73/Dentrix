@@ -19,6 +19,8 @@ import {
   Calendar,
   AlertTriangle,
   KeyRound,
+  UserCog,
+  Mail,
 } from 'lucide-react';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
@@ -27,6 +29,7 @@ import { useData } from '../context/DataContext';
 import { formatINR } from '../utils/format';
 import { ClinicTenant, User, UserRole, TenantSubscription } from '../types';
 import { AccessDeniedView } from './AccessDeniedView';
+import { ResetPasswordModal } from '../components/modals/ResetPasswordModal';
 
 interface SuperAdminViewProps {
   onOpenOnboardModal: () => void;
@@ -47,14 +50,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
   } = useAuth();
   const { systemHealth, allServices, toggleServiceActive } = useData();
 
-  const handleResetPassword = (userId: string, name: string) => {
-    const password = window.prompt(`Set a new password for ${name} (min 12 characters):`);
-    if (!password) return;
-    if (password.length < 12) {
-      window.alert('Password must be at least 12 characters.');
-      return;
-    }
-    void resetStaffPassword(userId, password);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<User | null>(null);
+  const handleConfirmResetPassword = async (password: string) => {
+    if (!resetPasswordTarget) return;
+    await resetStaffPassword(resetPasswordTarget.id, password);
+    setResetPasswordTarget(null);
   };
 
   if (currentUser.role !== 'SUPER_ADMIN') {
@@ -71,6 +71,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
   const [activeTab, setActiveTab] = useState<'tenants' | 'users' | 'assign-doctor' | 'services'>('tenants');
   const [searchQuery, setSearchQuery] = useState('');
   const [clinicFilter, setClinicFilter] = useState<string>('All');
+  const [rosterTab, setRosterTab] = useState<'doctors' | 'staff'>('doctors');
 
   // Modal State for Subscription Editing
   const [editingTenant, setEditingTenant] = useState<ClinicTenant | null>(null);
@@ -424,6 +425,132 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
             </div>
           </div>
 
+          {clinicFilter !== 'All' && clinicFilter !== 'platform' ? (
+            (() => {
+              const clinic = allTenants.find((t) => t.id === clinicFilter);
+              const clinicUsers = filteredUsers.filter((u) => u.tenantId === clinicFilter);
+              const doctors = clinicUsers.filter((u) => u.role === 'DOCTOR_ADMIN');
+              const staff = clinicUsers.filter((u) => u.role === 'STAFF');
+              const roster = rosterTab === 'doctors' ? doctors : staff;
+
+              const initials = (name: string) =>
+                name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
+
+              return (
+                <div className="space-y-4">
+                  {/* Clinic Identity Banner */}
+                  <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-amber-50 to-white rounded-2xl border border-amber-200">
+                    <div className="p-2.5 bg-amber-100 text-amber-700 rounded-2xl">
+                      <Building2 size={20} />
+                    </div>
+                    <div>
+                      <span className="font-extrabold text-sm text-slate-900 block">{clinic?.name}</span>
+                      <span className="text-[11px] text-slate-500 font-mono">{clinic?.slug}.dentrix.io</span>
+                    </div>
+                  </div>
+
+                  {/* Doctors / Staff Sub-tabs */}
+                  <div className="flex items-center gap-2 bg-surface-50 p-1.5 rounded-2xl border border-border w-fit">
+                    <button
+                      onClick={() => setRosterTab('doctors')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        rosterTab === 'doctors'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      <Stethoscope size={15} />
+                      <span>Doctors</span>
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-primary-50 text-primary-700 font-mono font-bold">
+                        {doctors.length}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setRosterTab('staff')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        rosterTab === 'staff'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      <UserCog size={15} />
+                      <span>Staff</span>
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-slate-100 text-slate-700 font-mono font-bold">
+                        {staff.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Roster Cards */}
+                  {roster.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-slate-400 bg-surface-50 rounded-2xl border border-dashed border-slate-200">
+                      No {rosterTab} found for this clinic{searchQuery ? ' matching your search' : ''}.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {roster.map((user) => (
+                        <div
+                          key={user.id}
+                          className="p-4 bg-white border border-border rounded-2xl flex items-center justify-between gap-3 hover:shadow-elevation-1 transition-all"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-11 h-11 rounded-2xl font-bold flex items-center justify-center text-sm flex-shrink-0 ${
+                                user.role === 'DOCTOR_ADMIN'
+                                  ? 'bg-primary-100 text-primary-800'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {initials(user.name)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-slate-900 truncate">{user.name}</span>
+                                <Badge variant={user.status === 'active' ? 'success' : 'danger'} dot>
+                                  {user.status}
+                                </Badge>
+                              </div>
+                              <div className="text-[11px] text-slate-500 truncate">{user.title}</div>
+                              <div className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
+                                <Mail size={11} className="flex-shrink-0" />
+                                {user.email}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => setResetPasswordTarget(user)}
+                              className="p-2 text-slate-500 hover:text-primary-700 hover:bg-primary-50 rounded-xl border border-transparent hover:border-primary-200 transition-all"
+                              title="Reset password"
+                            >
+                              <KeyRound size={15} />
+                            </button>
+                            <button
+                              onClick={() =>
+                                updateUser(user.id, { status: user.status === 'active' ? 'inactive' : 'active' })
+                              }
+                              className="p-2 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl border border-transparent hover:border-amber-200 transition-all"
+                              title={user.status === 'active' ? 'Suspend account' : 'Reactivate account'}
+                            >
+                              {user.status === 'active' ? <XCircle size={15} /> : <CheckCircle size={15} />}
+                            </button>
+                            <button
+                              onClick={() => deleteUserGlobal(user.id)}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-200 transition-all"
+                              title="Delete account"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="text-slate-600 bg-surface-50 uppercase tracking-wider font-semibold border-y border-border">
@@ -505,7 +632,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
                         </button>
 
                         <button
-                          onClick={() => handleResetPassword(user.id, user.name)}
+                          onClick={() => setResetPasswordTarget(user)}
                           className="text-[11px] font-bold p-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-surface-100 transition-all inline-flex items-center"
                           title="Reset password"
                         >
@@ -526,6 +653,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
 
@@ -850,6 +978,16 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
             </form>
           </div>
         </div>
+      )}
+
+      {/* MODAL: RESET PASSWORD */}
+      {resetPasswordTarget && (
+        <ResetPasswordModal
+          userName={resetPasswordTarget.name}
+          userTitle={resetPasswordTarget.title}
+          onClose={() => setResetPasswordTarget(null)}
+          onConfirm={handleConfirmResetPassword}
+        />
       )}
     </div>
   );

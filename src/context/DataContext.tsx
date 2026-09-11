@@ -22,13 +22,6 @@ import { ApiError, api } from '../lib/api';
 import { isoAfterDays } from '../utils/format';
 import { useAuth } from './AuthContext';
 
-// Standard chairs handed to a clinic that hasn't customised its operatories yet.
-const DEFAULT_OPERATORY_CHAIRS: Omit<OperatoryChairConfig, 'tenantId'>[] = [
-  { id: 'chair_default_1', name: 'Chair 1 - Hygiene', chairType: 'Hygiene', isActive: true, color: 'sky' },
-  { id: 'chair_default_2', name: 'Chair 2 - Surgery', chairType: 'Surgery', isActive: true, color: 'rose' },
-  { id: 'chair_default_3', name: 'Chair 3 - General', chairType: 'General', isActive: true, color: 'emerald' },
-];
-
 // Decorative infra telemetry — there is no `/system-health` endpoint (see CONTEXT.md).
 const STATIC_SYSTEM_HEALTH: SystemHealth = {
   databasePools: { active: 14, idle: 36, max: 100 },
@@ -215,13 +208,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [treatmentPlans, setTreatmentPlans] = useState<PatientTreatmentPlan[]>([]);
   const [serverChairs, setServerChairs] = useState<OperatoryChairConfig[]>([]);
 
-  // A brand-new clinic has no chairs configured yet; hand it a standard set (bound to
-  // the live tenant) so the booking dropdown isn't empty until it customises them
-  // via ManageChairs, which persists real rows and makes this fallback stop firing.
-  const operatoryChairs =
-    serverChairs.length > 0
-      ? serverChairs
-      : DEFAULT_OPERATORY_CHAIRS.map((c) => ({ ...c, tenantId: currentTenantId }));
+  // Every tenant is seeded with real chair rows at onboarding (backend/app/routers/tenants.py),
+  // so this is just the server list.
+  const operatoryChairs = serverChairs;
 
   // Loaders
   const loadPatients = useCallback(() => safeList<Patient>('/patients').then(setPatients), []);
@@ -669,7 +658,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateOperatoryChair = async (id: string, updates: Partial<OperatoryChairConfig>) => {
-    if (id.startsWith('chair_default_')) return; // fallback placeholder, not a real row
     await guard(async () => {
       await api(`/operatory-chairs/${id}`, { method: 'PATCH', body: updates });
       await loadChairs();
@@ -679,12 +667,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteOperatoryChair = async (
     id: string,
   ): Promise<{ success: boolean; message?: string }> => {
-    if (id.startsWith('chair_default_')) {
-      return {
-        success: false,
-        message: 'This is a starter chair template, not a saved one yet. Add your own operatory chairs first, then remove any of these placeholders.',
-      };
-    }
     const chair = operatoryChairs.find((c) => c.id === id);
     if (!chair) return { success: false, message: 'Chair not found.' };
     const inChairApt = appointments.find(

@@ -6,7 +6,6 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  AlertCircle,
   Armchair,
   Stethoscope,
   Building2,
@@ -292,15 +291,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={() => onNavigate('revenue')}
             />
           </>
-        ) : (
-          <div className="sm:col-span-2 p-5 bg-surface-50 border border-border rounded-2xl flex items-center space-x-3 text-slate-500">
-            <AlertCircle size={20} className="text-amber-500 flex-shrink-0" />
-            <div className="text-xs">
-              <span className="font-bold text-slate-700 block">Financial Access Scoped</span>
-              Revenue and billing reports are restricted by your Clinic Administrator.
-            </div>
-          </div>
-        )}
+        ) : null}
       </div>
 
       {/* Real-time Operatory Chair Monitoring */}

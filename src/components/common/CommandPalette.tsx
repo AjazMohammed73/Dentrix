@@ -15,6 +15,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { formatINR } from '../../utils/format';
 
 interface CommandPaletteProps {
@@ -46,6 +47,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onOpenAudit,
 }) => {
   const { patients, appointments, services } = useData();
+  const { currentUser } = useAuth();
+  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
+  const isDoctor = currentUser.role === 'DOCTOR_ADMIN';
+  const canViewRevenue = currentUser.permissions.canViewRevenue || isSuperAdmin;
+  const canManageServices = (currentUser.permissions.canManageServices || isDoctor || isSuperAdmin) && !isSuperAdmin;
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -94,7 +100,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     });
   }
 
-  if (!q || q.includes('bill') || q.includes('invoice') || q.includes('pay') || q.includes('rev')) {
+  if (canViewRevenue && (!q || q.includes('bill') || q.includes('invoice') || q.includes('pay') || q.includes('rev'))) {
     items.push({
       id: 'act_revenue',
       category: 'action',
@@ -108,7 +114,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     });
   }
 
-  if (!q || q.includes('service') || q.includes('fee') || q.includes('cdt') || q.includes('procedure')) {
+  if (canManageServices && (!q || q.includes('service') || q.includes('fee') || q.includes('cdt') || q.includes('procedure'))) {
     items.push({
       id: 'act_services',
       category: 'action',
@@ -177,7 +183,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       });
 
     // Procedures Match
-    services
+    if (canManageServices) services
       .filter(
         (s) =>
           s.code.toLowerCase().includes(q) ||

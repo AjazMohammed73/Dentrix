@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, FileText, User, DollarSign, Calendar, CreditCard, Sparkles, Percent, Receipt } from 'lucide-react';
+import { X, FileText, User, DollarSign, Calendar, CreditCard, Sparkles, Percent, Receipt, Plus, Check } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { InvoiceStatus, Invoice } from '../../types';
@@ -22,8 +22,37 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const { currentTenant } = useAuth();
 
   const [patientId, setPatientId] = useState(initialPatientId || (patients[0]?.id || ''));
-  const [serviceName, setServiceName] = useState(services[0]?.name || 'Routine Dental Care & Consultation');
-  const [subtotal, setSubtotal] = useState<number>(services[0]?.basePrice || 2500);
+
+  // Multiple CDT procedures per invoice — subtotal is always the sum of the picked items.
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(
+    services[0] ? [services[0].id] : [],
+  );
+  const [customLines, setCustomLines] = useState<{ id: string; name: string; fee: number }[]>([]);
+  const [customName, setCustomName] = useState('');
+  const [customFee, setCustomFee] = useState<number>(0);
+
+  const selectedServices = services.filter((s) => selectedServiceIds.includes(s.id));
+  const serviceName =
+    [...selectedServices.map((s) => s.name), ...customLines.map((c) => c.name)].join(', ') ||
+    'Routine Dental Care & Consultation';
+  const subtotal =
+    selectedServices.reduce((sum, s) => sum + s.basePrice, 0) +
+    customLines.reduce((sum, c) => sum + c.fee, 0);
+
+  const toggleService = (id: string) => {
+    setSelectedServiceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const addCustomLine = () => {
+    if (!customName.trim() || customFee <= 0) return;
+    setCustomLines((prev) => [...prev, { id: `custom_${Date.now()}`, name: customName.trim(), fee: customFee }]);
+    setCustomName('');
+    setCustomFee(0);
+  };
+
+  const removeCustomLine = (id: string) => {
+    setCustomLines((prev) => prev.filter((c) => c.id !== id));
+  };
 
   // Discounts state
   const [discountType, setDiscountType] = useState<'flat' | 'percentage'>('percentage');
@@ -68,18 +97,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     }
   };
 
-  const handleServiceSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const sName = e.target.value;
-    setServiceName(sName);
-    const matchedService = services.find((s) => s.name === sName);
-    if (matchedService) {
-      setSubtotal(matchedService.basePrice);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatient) return;
+    if (selectedServices.length === 0 && customLines.length === 0) {
+      window.alert('Select at least one dental service / CDT procedure to bill.');
+      return;
+    }
 
     try {
       // invoiceNumber / patientName / balance are set server-side; kept here to
@@ -161,39 +185,100 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             </select>
           </div>
 
-          {/* Service / Procedure */}
+          {/* Services / Procedures — pick as many as billed, subtotal sums their base fees */}
           <div>
-            <label className="block font-bold text-slate-700 mb-1">
-              Dental Service / CDT Procedure *
+            <label className="block font-bold text-slate-700 mb-1.5">
+              Dental Services / CDT Procedures *
             </label>
-            <select
-              value={serviceName}
-              onChange={handleServiceSelect}
-              className="w-full bg-surface-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
-              required
-            >
-              {services.map((s) => (
-                <option key={s.id} value={s.name}>
-                  [{s.code}] {s.name} ({formatINR(s.basePrice)})
-                </option>
-              ))}
-              <option value="Custom Procedure / Treatment">Custom Procedure / Treatment</option>
-            </select>
+            <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-surface-50 border border-slate-200 rounded-xl">
+              {services.map((s) => {
+                const checked = selectedServiceIds.includes(s.id);
+                return (
+                  <button
+                    type="button"
+                    key={s.id}
+                    onClick={() => toggleService(s.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-all ${
+                      checked
+                        ? 'bg-primary-50 border border-primary-300'
+                        : 'bg-white border border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${
+                          checked ? 'bg-primary-600 border-primary-600 text-white' : 'border-slate-300'
+                        }`}
+                      >
+                        {checked && <Check size={11} strokeWidth={3} />}
+                      </span>
+                      <span className="font-semibold text-slate-800 truncate">[{s.code}] {s.name}</span>
+                    </span>
+                    <span className="font-mono font-bold text-slate-700 flex-shrink-0 ml-2">
+                      {formatINR(s.basePrice)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom / off-catalog line items */}
+            {customLines.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {customLines.map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs"
+                  >
+                    <span className="font-semibold text-amber-900">{c.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-amber-900">{formatINR(c.fee)}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeCustomLine(c.id)}
+                        className="text-amber-700 hover:text-rose-600"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Custom procedure name"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <input
+                type="text"
+                placeholder="Fee ₹"
+                value={customFee || ''}
+                onChange={(e) => setCustomFee(Number(e.target.value.replace(/\D/g, '')) || 0)}
+                className="w-24 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <button
+                type="button"
+                onClick={addCustomLine}
+                className="p-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg flex-shrink-0"
+                title="Add custom line item"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
           </div>
 
-          {/* Subtotal Base Fee */}
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+          {/* Subtotal (auto-summed) */}
+          <div className="p-3 bg-surface-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+            <span className="font-bold text-slate-700 flex items-center gap-1.5">
               <DollarSign size={13} className="text-primary-600" />
-              Procedure Base Fee (Subtotal ₹) *
-            </label>
-            <input
-              type="text"
-              value={subtotal}
-              onChange={(e) => setSubtotal(Number(e.target.value.replace(/\D/g, '')) || 0)}
-              className="w-full bg-surface-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              required
-            />
+              Subtotal ({selectedServices.length + customLines.length} item{selectedServices.length + customLines.length === 1 ? '' : 's'})
+            </span>
+            <span className="font-mono font-extrabold text-slate-900">{formatINR(subtotal)}</span>
           </div>
 
           {/* Discounts Section */}

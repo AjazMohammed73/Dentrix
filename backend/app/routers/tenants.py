@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..audit import record_audit
 from ..database import get_db
 from ..dependencies import CurrentUser, require_super_admin
-from ..models import FULL_PERMISSIONS, Tenant, User
+from ..models import FULL_PERMISSIONS, OperatoryChairConfig, Tenant, User
 from ..schemas.tenant import (
     AssignDoctorAdminRequest,
     TenantCreate,
@@ -32,6 +32,13 @@ _PLAN_DEFAULTS: dict[str, tuple[int, int]] = {
 }
 
 _DOCTOR_TITLE_HINTS = ("Doctor", "DDS", "DMD")
+
+# Standard starter chairs given to every new clinic (real DB rows, not a client-side fallback).
+_DEFAULT_CHAIRS = [
+    ("Chair 1 - Hygiene", "Hygiene", "sky"),
+    ("Chair 2 - Surgery", "Surgery", "rose"),
+    ("Chair 3 - General", "General", "emerald"),
+]
 
 
 @router.get("", response_model=list[TenantOut])
@@ -84,6 +91,12 @@ def onboard_tenant(
                 status="active",
             )
         )
+        for name, chair_type, color in _DEFAULT_CHAIRS:
+            db.add(
+                OperatoryChairConfig(
+                    tenant_id=tenant.id, name=name, chair_type=chair_type, is_active=True, color=color,
+                )
+            )
         record_audit(
             db, request, actor, "TENANT_CREATED", "Tenant", tenant.id,
             f"Onboarded {tenant.name} ({tenant.slug})", tenant_id=tenant.id,
