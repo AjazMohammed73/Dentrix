@@ -7,8 +7,10 @@ services:
     rootDir: backend
     plan: free
     buildCommand: pip install -r requirements.txt
-    preDeployCommand: alembic upgrade head
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-server-header --proxy-headers
+    # ponytail: preDeployCommand needs a paid plan, so migrations run inline
+    # on the free tier — fine at this scale, move back to preDeployCommand
+    # once on a paid plan (avoids running migrations on every dyno boot).
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-server-header --proxy-headers
     healthCheckPath: /health
     envVars:
       - key: ENV
