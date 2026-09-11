@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Bell,
   Search,
   Plus,
   Building,
@@ -169,16 +168,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </button>
         )}
 
-        {/* Notification Bell */}
-        <div className="relative">
-          <button
-            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-surface-100 rounded-xl transition-colors relative"
-            title="Notifications"
-          >
-            <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-clinical-danger animate-pulse" />
-          </button>
-        </div>
       </div>
 
       <AuditLogModal

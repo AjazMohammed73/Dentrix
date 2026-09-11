@@ -35,6 +35,7 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
   const [newRoom, setNewRoom] = useState('');
   const [newType, setNewType] = useState<OperatoryChairType>('General');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [chairToDelete, setChairToDelete] = useState<{ id: string; name: string } | null>(null);
 
   if (!isOpen) return null;
 
@@ -84,15 +85,15 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
     setErrorMessage(null);
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Are you sure you want to remove ${name}?`)) {
-      const res = await deleteOperatoryChair(id);
-      if (!res.success) {
-        setErrorMessage(res.message || 'Could not delete chair.');
-      } else {
-        setErrorMessage(null);
-      }
+  const handleConfirmDelete = async () => {
+    if (!chairToDelete) return;
+    const res = await deleteOperatoryChair(chairToDelete.id);
+    if (!res.success) {
+      setErrorMessage(res.message || 'Could not delete chair.');
+    } else {
+      setErrorMessage(null);
     }
+    setChairToDelete(null);
   };
 
   const getChairTypeBadge = (type: OperatoryChairType) => {
@@ -433,7 +434,7 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
                       {/* Delete */}
                       <button
                         type="button"
-                        onClick={() => handleDelete(chair.id, chair.name)}
+                        onClick={() => setChairToDelete({ id: chair.id, name: chair.name })}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-200 transition-all"
                         title="Remove Operatory"
                       >
@@ -472,6 +473,43 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {chairToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-border p-6 space-y-4">
+            <div className="flex items-center space-x-3 text-rose-600">
+              <div className="p-2.5 bg-rose-50 rounded-2xl border border-rose-100">
+                <AlertCircle size={22} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Remove Operatory Chair</h3>
+                <p className="text-xs text-slate-500">This cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to remove <strong>{chairToDelete.name}</strong>? Past appointments
+              keep the chair name on record, but it will no longer be available for new bookings.
+            </p>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                onClick={() => setChairToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/25"
+              >
+                Yes, Remove Chair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

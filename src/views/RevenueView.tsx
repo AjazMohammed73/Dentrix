@@ -132,26 +132,45 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
   const collectionRate =
     totalGrossBilled > 0 ? Math.round((totalCollected / totalGrossBilled) * 100) : 100;
 
-  // Monthly breakdown mock data for chart (in INR)
-  const monthlyData = [
-    { month: 'Apr', billed: 142000, collected: 138000 },
-    { month: 'May', billed: 165000, collected: 159000 },
-    { month: 'Jun', billed: 189000, collected: 174000 },
-    { month: 'Jul', billed: 213000, collected: 201000 },
-    { month: 'Aug', billed: 248000, collected: 232000 },
-    { month: 'Sep (Current)', billed: 274000, collected: 251000 },
-  ];
+  // Last 6 calendar months, billed/collected computed from real invoices.
+  const monthLabels = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - (5 - i));
+    return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toLocaleString('en-US', { month: 'short' }) };
+  });
+  const monthlyData = monthLabels.map(({ key, label }, i) => {
+    const inMonth = invoices.filter((inv) => inv.date?.startsWith(key));
+    return {
+      month: i === monthLabels.length - 1 ? `${label} (Current)` : label,
+      billed: inMonth.reduce((sum, inv) => sum + inv.amount, 0),
+      collected: inMonth.reduce((sum, inv) => sum + inv.amountPaid, 0),
+    };
+  });
 
-  const maxMonthVal = Math.max(...monthlyData.map((m) => m.billed));
+  const maxMonthVal = Math.max(...monthlyData.map((m) => m.billed), 1);
+  const currentMonthBilled = monthlyData[monthlyData.length - 1]?.billed ?? 0;
+  const prevMonthBilled = monthlyData[monthlyData.length - 2]?.billed ?? 0;
+  const monthGrowthPct = prevMonthBilled > 0
+    ? Math.round(((currentMonthBilled - prevMonthBilled) / prevMonthBilled) * 1000) / 10
+    : 0;
 
-  // Service breakdown (in INR)
-  const serviceCategories = [
-    { category: 'Restorative (Crowns & Fillings)', amount: 124000, pct: 45, color: 'bg-primary-600' },
-    { category: 'Endodontics (Root Canals)', amount: 62000, pct: 23, color: 'bg-indigo-600' },
-    { category: 'Preventive & Hygiene Cleanings', amount: 48000, pct: 18, color: 'bg-emerald-600' },
-    { category: 'Periodontics & Scaling', amount: 24000, pct: 9, color: 'bg-amber-600' },
-    { category: 'Oral Surgery & Consultations', amount: 16000, pct: 5, color: 'bg-sky-600' },
-  ];
+  // Service breakdown computed from real invoices, grouped by service name.
+  const serviceColors = ['bg-primary-600', 'bg-indigo-600', 'bg-emerald-600', 'bg-amber-600', 'bg-sky-600', 'bg-rose-600'];
+  const serviceTotals = new Map<string, number>();
+  invoices.forEach((inv) => {
+    serviceTotals.set(inv.serviceName, (serviceTotals.get(inv.serviceName) || 0) + inv.amount);
+  });
+  const serviceCategories = Array.from(serviceTotals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([category, amount], i) => ({
+      category,
+      amount,
+      pct: totalGrossBilled > 0 ? Math.round((amount / totalGrossBilled) * 100) : 0,
+      color: serviceColors[i % serviceColors.length],
+    }));
+  const leadingServiceCategory = serviceCategories[0]?.category ?? '—';
 
   const filteredInvoices = invoices.filter((i) => {
     const matchesStatus = statusFilter === 'All' || i.status === statusFilter;
@@ -893,7 +912,6 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
         <StatCard
           title="Total Collections Received"
           value={formatINR(totalCollected)}
-          trend={{ value: '14.2%', isPositive: true }}
           icon={TrendingUp}
           iconBgColor="bg-emerald-50"
           iconColor="text-emerald-600"
@@ -968,8 +986,8 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
             })}
           </div>
           <div className="pt-3 flex items-center justify-between text-xs text-slate-500">
-            <span>Average monthly growth: +9.6%</span>
-            <span className="font-bold text-slate-900">Current Month: {formatINR(274000)}</span>
+            <span>Month-over-month growth: {monthGrowthPct >= 0 ? '+' : ''}{monthGrowthPct}%</span>
+            <span className="font-bold text-slate-900">Current Month: {formatINR(currentMonthBilled)}</span>
           </div>
         </div>
 
@@ -1001,7 +1019,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
 
           <div className="mt-6 pt-4 border-t border-border flex items-center justify-between text-xs text-slate-600 font-semibold">
             <span>Leading Revenue Driver:</span>
-            <span className="text-primary-700 font-bold">Crown & Restorative</span>
+            <span className="text-primary-700 font-bold">{leadingServiceCategory}</span>
           </div>
         </div>
       </div>

@@ -679,6 +679,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteOperatoryChair = async (
     id: string,
   ): Promise<{ success: boolean; message?: string }> => {
+    if (id.startsWith('chair_default_')) {
+      return {
+        success: false,
+        message: 'This is a starter chair template, not a saved one yet. Add your own operatory chairs first, then remove any of these placeholders.',
+      };
+    }
     const chair = operatoryChairs.find((c) => c.id === id);
     if (!chair) return { success: false, message: 'Chair not found.' };
     const inChairApt = appointments.find(
