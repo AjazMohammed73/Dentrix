@@ -28,6 +28,7 @@ import {
   FileCheck,
   ShieldAlert,
   ChevronRight,
+  FileDown,
 } from 'lucide-react';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
@@ -36,6 +37,7 @@ import { useAuth } from '../context/AuthContext';
 import { InvoiceStatus, Invoice, PaymentInstallment, ClinicTenant, TenantSubscription } from '../types';
 import { formatINR, todayISO } from '../utils/format';
 import { toCsv, downloadCsv } from '../utils/csv';
+import { shareOrDownloadInvoicePdf } from '../utils/invoicePdf';
 import { AccessDeniedView } from './AccessDeniedView';
 import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
 import { InvoicePrintModal } from '../components/modals/InvoicePrintModal';
@@ -1153,6 +1155,14 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                         title="Print / View Invoice"
                       >
                         <Printer size={15} />
+                      </button>
+                      {/* Share/Save PDF — native OS share sheet, no server or WhatsApp API */}
+                      <button
+                        onClick={() => void shareOrDownloadInvoicePdf(inv, currentTenant || {})}
+                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="Share or save invoice as PDF"
+                      >
+                        <FileDown size={15} />
                       </button>
                       {/* WhatsApp Share Button — opens the patient's own chat directly */}
                       <button

@@ -1,8 +1,9 @@
 import React from 'react';
-import { X, Printer, Share2, FileText } from 'lucide-react';
+import { X, Printer, Share2, FileText, FileDown } from 'lucide-react';
 import { Invoice } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { formatINR } from '../../utils/format';
+import { shareOrDownloadInvoicePdf } from '../../utils/invoicePdf';
 
 interface InvoicePrintModalProps {
   isOpen: boolean;
@@ -45,6 +46,10 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
 
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://api.whatsapp.com/send?text=${encodedMessage}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleSharePdf = () => {
+    void shareOrDownloadInvoicePdf(invoice, currentTenant || {});
   };
 
   return (
@@ -108,6 +113,14 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={handleSharePdf}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-black text-black hover:bg-black hover:text-white text-xs font-bold transition-all"
+              title="Share or save invoice as PDF"
+            >
+              <FileDown size={13} />
+              <span>Share PDF</span>
+            </button>
             <button
               onClick={handleWhatsAppShare}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-black text-black hover:bg-black hover:text-white text-xs font-bold transition-all"
