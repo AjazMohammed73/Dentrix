@@ -20,7 +20,7 @@ import {
   Check,
   LogIn,
 } from 'lucide-react';
-import { Tooth3D } from '../components/layout/Tooth3D';
+import { Tooth3D } from '../components/layout/Tooth3DLazy';
 import { useAuth } from '../context/AuthContext';
 
 interface LandingPageViewProps {

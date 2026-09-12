@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, LogIn, ShieldAlert, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { Tooth3D } from '../layout/Tooth3D';
+import { Tooth3D } from '../layout/Tooth3DLazy';
 
 interface SignInModalProps {
   isOpen: boolean;

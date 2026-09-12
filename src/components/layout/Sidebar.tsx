@@ -12,7 +12,7 @@ import {
   ShieldAlert,
   LogOut,
 } from 'lucide-react';
-import { Tooth3D } from './Tooth3D';
+import { Tooth3D } from './Tooth3DLazy';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { todayISO } from '../../utils/format';
