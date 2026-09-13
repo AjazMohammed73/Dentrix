@@ -30,6 +30,7 @@ import { formatINR } from '../utils/format';
 import { ClinicTenant, User, UserRole, TenantSubscription } from '../types';
 import { AccessDeniedView } from './AccessDeniedView';
 import { ResetPasswordModal } from '../components/modals/ResetPasswordModal';
+import { useEatenDelete } from '../hooks/useEatenDelete';
 
 interface SuperAdminViewProps {
   onOpenOnboardModal: () => void;
@@ -51,6 +52,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
   const { systemHealth, allServices, toggleServiceActive } = useData();
 
   const [resetPasswordTarget, setResetPasswordTarget] = useState<User | null>(null);
+  const { rowClass, binClass, trigger: triggerDelete } = useEatenDelete<string>();
   const handleConfirmResetPassword = async (password: string) => {
     if (!resetPasswordTarget) return;
     await resetStaffPassword(resetPasswordTarget.id, password);
@@ -491,7 +493,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
                       {roster.map((user) => (
                         <div
                           key={user.id}
-                          className="p-4 bg-white border border-border rounded-2xl flex items-center justify-between gap-3 hover:shadow-elevation-1 transition-all"
+                          className={`p-4 bg-white border border-border rounded-2xl flex items-center justify-between gap-3 hover:shadow-elevation-1 transition-all ${rowClass(user.id)}`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div
@@ -536,11 +538,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
                               {user.status === 'active' ? <XCircle size={15} /> : <CheckCircle size={15} />}
                             </button>
                             <button
-                              onClick={() => deleteUserGlobal(user.id)}
+                              onClick={() => triggerDelete(user.id, () => deleteUserGlobal(user.id))}
                               className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-200 transition-all"
                               title="Delete account"
                             >
-                              <Trash2 size={15} />
+                              <Trash2 size={15} className={binClass(user.id)} />
                             </button>
                           </div>
                         </div>
@@ -567,7 +569,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
                 {filteredUsers.map((user) => {
                   const userTenant = allTenants.find((t) => t.id === user.tenantId);
                   return (
-                    <tr key={user.id} className="hover:bg-surface-50/60">
+                    <tr key={user.id} className={`hover:bg-surface-50/60 ${rowClass(user.id)}`}>
                       <td className="py-4 px-4">
                         <span className="font-bold text-sm text-slate-900 block">
                           {user.name}
@@ -640,11 +642,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
                         </button>
 
                         <button
-                          onClick={() => deleteUserGlobal(user.id)}
+                          onClick={() => triggerDelete(user.id, () => deleteUserGlobal(user.id))}
                           className="text-[11px] font-bold p-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all inline-flex items-center"
                           title="Revoke and delete user account"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={13} className={binClass(user.id)} />
                         </button>
                       </td>
                     </tr>

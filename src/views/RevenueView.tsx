@@ -38,6 +38,7 @@ import { InvoiceStatus, Invoice, PaymentInstallment, ClinicTenant, TenantSubscri
 import { formatINR, todayISO } from '../utils/format';
 import { toCsv, downloadCsv } from '../utils/csv';
 import { shareOrDownloadInvoicePdf } from '../utils/invoicePdf';
+import { useEatenDelete } from '../hooks/useEatenDelete';
 import { AccessDeniedView } from './AccessDeniedView';
 import { CreateInvoiceModal } from '../components/modals/CreateInvoiceModal';
 import { InvoicePrintModal } from '../components/modals/InvoicePrintModal';
@@ -115,6 +116,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
 
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const { rowClass, binClass, trigger: triggerDeleteInvoice } = useEatenDelete<string>();
 
   // Daily calculations
   const todayStr = todayISO();
@@ -1071,7 +1073,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
             </thead>
             <tbody className="divide-y divide-border">
               {filteredInvoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-surface-50/60">
+                <tr key={inv.id} className={`hover:bg-surface-50/60 ${rowClass(inv.id)}`}>
                   <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
                     {inv.invoiceNumber}
                   </td>
@@ -1195,13 +1197,13 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete invoice ${inv.invoiceNumber} for ${inv.patientName}?`)) {
-                            deleteInvoice(inv.id);
+                            triggerDeleteInvoice(inv.id, () => deleteInvoice(inv.id));
                           }
                         }}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                         title="Delete Invoice"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={15} className={binClass(inv.id)} />
                       </button>
                     </div>
                   </td>

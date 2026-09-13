@@ -13,6 +13,7 @@ import {
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { OperatoryChairConfig, OperatoryChairType } from '../../types';
+import { useEatenDelete } from '../../hooks/useEatenDelete';
 
 interface ManageChairsModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
   const [newType, setNewType] = useState<OperatoryChairType>('General');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [chairToDelete, setChairToDelete] = useState<{ id: string; name: string } | null>(null);
+  const { rowClass, binClass, trigger: triggerDelete } = useEatenDelete<string>();
 
   if (!isOpen) return null;
 
@@ -85,14 +87,17 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
     setErrorMessage(null);
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = () => {
     if (!chairToDelete) return;
-    const res = await deleteOperatoryChair(chairToDelete.id);
-    if (!res.success) {
-      setErrorMessage(res.message || 'Could not delete chair.');
-    } else {
-      setErrorMessage(null);
-    }
+    const id = chairToDelete.id;
+    triggerDelete(id, async () => {
+      const res = await deleteOperatoryChair(id);
+      if (!res.success) {
+        setErrorMessage(res.message || 'Could not delete chair.');
+      } else {
+        setErrorMessage(null);
+      }
+    });
     setChairToDelete(null);
   };
 
@@ -363,7 +368,7 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
                     key={chair.id}
                     className={`p-4 bg-surface-50 hover:bg-white border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
                       chair.isActive ? 'border-border' : 'border-slate-200 opacity-60'
-                    }`}
+                    } ${rowClass(chair.id)}`}
                   >
                     <div className="flex items-center space-x-3.5">
                       <div
@@ -438,7 +443,7 @@ export const ManageChairsModal: React.FC<ManageChairsModalProps> = ({ isOpen, on
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-200 transition-all"
                         title="Remove Operatory"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={15} className={binClass(chair.id)} />
                       </button>
                     </div>
                   </div>

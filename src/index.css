@@ -44,3 +44,51 @@
 .animate-fadeIn {
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* "Bin eats the row" delete animation — see src/hooks/useEatenDelete.ts */
+@keyframes eatenShrink {
+  0% {
+    transform: scale(1) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  55% {
+    transform: scale(0.45) translateX(10px) rotate(3deg);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(0) translateX(22px) rotate(6deg);
+    opacity: 0;
+  }
+}
+
+.animate-eaten {
+  animation: eatenShrink 0.42s ease-in forwards;
+  transform-origin: right center;
+  overflow: hidden;
+}
+
+@keyframes binChomp {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  15% {
+    transform: rotate(-14deg) scale(1.08);
+  }
+  32% {
+    transform: rotate(12deg) scale(1.15);
+  }
+  48% {
+    transform: rotate(-9deg) scale(1.1);
+  }
+  65% {
+    transform: rotate(6deg) scale(1.05);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+.animate-bin-chomp {
+  animation: binChomp 0.42s ease-in-out;
+  display: inline-flex;
+}

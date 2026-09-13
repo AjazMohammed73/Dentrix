@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { UserPermissions } from '../types';
 import { AccessDeniedView } from './AccessDeniedView';
+import { useEatenDelete } from '../hooks/useEatenDelete';
 
 interface StaffViewProps {
   onOpenAddStaff: () => void;
@@ -42,6 +43,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ onOpenAddStaff, onNavigate
   }
 
   const [staffToDelete, setStaffToDelete] = useState<{ id: string; name: string } | null>(null);
+  const { rowClass, binClass, trigger: triggerDelete } = useEatenDelete<string>();
 
   // Filter staff belonging to current tenant
   const tenantStaff = allUsers.filter(
@@ -110,7 +112,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ onOpenAddStaff, onNavigate
               {tenantStaff.map((staff) => {
                 const isDoctor = staff.role === 'DOCTOR_ADMIN';
                 return (
-                  <tr key={staff.id} className="hover:bg-surface-50/60">
+                  <tr key={staff.id} className={`hover:bg-surface-50/60 ${rowClass(staff.id)}`}>
                     <td className="py-4 px-5">
                       <div className="flex items-center space-x-3">
                         <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-800 font-bold flex items-center justify-center text-xs shadow-sm">
@@ -197,7 +199,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ onOpenAddStaff, onNavigate
                           className="text-[11px] font-bold p-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:border-rose-300 transition-all inline-flex items-center"
                           title="Delete staff member"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={13} className={binClass(staff.id)} />
                         </button>
                       )}
                     </td>
@@ -236,7 +238,7 @@ export const StaffView: React.FC<StaffViewProps> = ({ onOpenAddStaff, onNavigate
               </button>
               <button
                 onClick={() => {
-                  deleteStaffMember(staffToDelete.id);
+                  triggerDelete(staffToDelete.id, () => deleteStaffMember(staffToDelete.id));
                   setStaffToDelete(null);
                 }}
                 className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/25"
