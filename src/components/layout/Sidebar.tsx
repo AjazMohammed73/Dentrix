@@ -156,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSi
                 {isSuperAdmin ? 'Global Multi-Tenant Root' : currentTenant?.name}
               </span>
               <span className="text-[10px] text-slate-600">
-                {isSuperAdmin ? 'System Health: 99.98%' : `Plan: ${currentTenant?.plan || 'Active'}`}
+                {isSuperAdmin ? 'Platform Administrator' : `Plan: ${currentTenant?.plan || 'Active'}`}
               </span>
             </div>
           </div>

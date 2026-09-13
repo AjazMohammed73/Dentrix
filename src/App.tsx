@@ -31,7 +31,11 @@ import { Invoice } from './types';
 
 const AppContent: React.FC = () => {
   const { currentUser, currentTenant, isAuthenticated, loading } = useAuth();
-  const [showLandingPage, setShowLandingPage] = useState<boolean>(true);
+  // Once a session has entered the app, a reload should restore the dashboard, not
+  // dump them back to the marketing landing page (that looked like an unexplained logout).
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(
+    () => sessionStorage.getItem('dentrix_entered_app') !== 'true',
+  );
   const [isSignInOpen, setIsSignInOpen] = useState<boolean>(false);
   const [currentRoute, setCurrentRoute] = useState<NavRoute>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -60,6 +64,15 @@ const AppContent: React.FC = () => {
     sessionStorage.removeItem('dentrix_workstation_locked');
     setIsWorkstationLocked(false);
   };
+
+  // Session restore failed (expired/revoked) — stop treating this browser as "already
+  // entered the app" so the next reload shows the landing page instantly instead of
+  // a loading spinner that just ends in a bounce back to landing anyway.
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      sessionStorage.removeItem('dentrix_entered_app');
+    }
+  }, [loading, isAuthenticated]);
 
   // 5-Minute Inactivity Auto-Lock for Chairside PHI Protection
   useEffect(() => {
@@ -117,23 +130,20 @@ const AppContent: React.FC = () => {
     if (!isAuthenticated) {
       setIsSignInOpen(true);
     } else {
+      sessionStorage.setItem('dentrix_entered_app', 'true');
       setShowLandingPage(false);
     }
   };
 
   const handleSignOut = () => {
+    sessionStorage.removeItem('dentrix_entered_app');
     setShowLandingPage(true);
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#F8F9FA] text-slate-500 text-sm font-semibold">
-        Loading Dentrix…
-      </div>
-    );
-  }
-
-  if (showLandingPage || !isAuthenticated) {
+  // The landing page doesn't need auth state (Launch/Sign-in check isAuthenticated at
+  // click time), so it must never wait on the auth-restore network round trip — that
+  // call can be slow (Render free tier cold start) and shouldn't block first paint.
+  if (showLandingPage || (!isAuthenticated && !loading)) {
     return (
       <>
         <LandingPageView
@@ -144,11 +154,20 @@ const AppContent: React.FC = () => {
           isOpen={isSignInOpen}
           onClose={() => setIsSignInOpen(false)}
           onSuccess={() => {
+            sessionStorage.setItem('dentrix_entered_app', 'true');
             setIsSignInOpen(false);
             setShowLandingPage(false);
           }}
         />
       </>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#F8F9FA] text-slate-500 text-sm font-semibold">
+        Loading Dentrix…
+      </div>
     );
   }
 

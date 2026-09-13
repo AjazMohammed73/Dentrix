@@ -16,21 +16,10 @@ import {
   TreatmentPlanItem,
   OperatoryChairConfig,
   OperatoryChairType,
-  SystemHealth,
 } from '../types';
 import { ApiError, api } from '../lib/api';
 import { isoAfterDays } from '../utils/format';
 import { useAuth } from './AuthContext';
-
-// Decorative infra telemetry — there is no `/system-health` endpoint (see CONTEXT.md).
-const STATIC_SYSTEM_HEALTH: SystemHealth = {
-  databasePools: { active: 14, idle: 36, max: 100 },
-  storageUsedGb: 28.4,
-  storageTotalGb: 250,
-  uptimePercent: 99.98,
-  activeTenantsCount: 2,
-  totalAppointmentsToday: 0,
-};
 
 interface BookAppointmentInput {
   patientId: string;
@@ -62,7 +51,6 @@ interface DataContextType {
   clinicalNotes: ClinicalNote[];
   invoices: Invoice[];
   auditLogs: AuditLogEntry[];
-  systemHealth: SystemHealth;
   loading: boolean;
   refreshAll: () => Promise<void>;
 
@@ -735,7 +723,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clinicalNotes,
         invoices,
         auditLogs,
-        systemHealth: STATIC_SYSTEM_HEALTH,
         loading,
         refreshAll,
 

@@ -61,12 +61,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Filter active chairs from data context
-  const activeChairs = operatoryChairs.filter((c) => c.isActive);
-  const chairNames =
-    activeChairs.length > 0
-      ? activeChairs.map((c) => c.name)
-      : ['Chair 1 - Hygiene', 'Chair 2 - Surgery', 'Chair 3 - General'];
+  // Filter active chairs from data context — every tenant has real seeded chairs.
+  const chairNames = operatoryChairs.filter((c) => c.isActive).map((c) => c.name);
 
   const filteredAppointments = appointments.filter((a) => {
     const matchesDate = a.date === selectedDate;
@@ -241,7 +237,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({
           >
             <Armchair size={14} className="text-primary-600" />
             <span>
-              Operatories ({activeChairs.length}/{currentTenant?.subscription?.chairLimit || 6})
+              Operatories ({chairNames.length}/{currentTenant?.subscription?.chairLimit || 6})
             </span>
           </button>
 

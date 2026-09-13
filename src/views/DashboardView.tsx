@@ -9,7 +9,6 @@ import {
   Armchair,
   Stethoscope,
   Building2,
-  Database,
   HardDrive,
   Activity,
   ArrowRight,
@@ -38,12 +37,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectPatient,
   onOpenCreateInvoice,
 }) => {
-  const { currentUser, currentTenant, allTenants } = useAuth();
+  const { currentUser, currentTenant, allTenants, allUsers } = useAuth();
   const {
     appointments,
     patients,
     invoices,
-    systemHealth,
     updateAppointmentStatus,
     operatoryChairs,
   } = useData();
@@ -63,17 +61,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .filter((i) => i.status !== 'Paid')
     .reduce((sum, i) => sum + i.balance, 0);
 
-  // Operatory Chair Statuses from Dynamic Context
-  const activeChairsList = operatoryChairs.filter((c) => c.isActive);
-  const chairs = (
-    activeChairsList.length > 0
-      ? activeChairsList
-      : [
-          { id: '1', name: 'Chair 1 - Hygiene', chairType: 'Hygiene' as const },
-          { id: '2', name: 'Chair 2 - Surgery', chairType: 'Surgery' as const },
-          { id: '3', name: 'Chair 3 - General', chairType: 'General' as const },
-        ]
-  ).map((c) => ({
+  // Operatory Chair Statuses from Dynamic Context — every tenant is seeded with real
+  // chairs at onboarding (backend/app/routers/tenants.py), so no client-side fallback.
+  const chairs = operatoryChairs.filter((c) => c.isActive).map((c) => ({
     name: c.name,
     currentApt: todaysAppointments.find(
       (a) => a.operatoryChair === c.name && a.status === 'In-Chair'
@@ -96,7 +86,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Super Admin Global Console</h1>
             <p className="text-xs text-slate-300 mt-1">
-              Overseeing tenant database partitions, connection pooling, and infrastructure health.
+              Overseeing clinic subscriptions, staff accounts, and the services catalog platform-wide.
             </p>
           </div>
           <button
@@ -118,25 +108,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             iconColor="text-amber-700"
           />
           <StatCard
-            title="Database Connection Pools"
-            value={`${systemHealth.databasePools.active}/${systemHealth.databasePools.max}`}
-            subtitle={`${systemHealth.databasePools.idle} Idle connections`}
-            icon={Database}
+            title="Platform Monthly Recurring"
+            value={formatINR(
+              allTenants
+                .filter((t) => t.status === 'active')
+                .reduce((sum, t) => sum + (t.subscription?.monthlyFee || 0), 0),
+            )}
+            subtitle="Active clinic subscriptions"
+            icon={DollarSign}
             iconBgColor="bg-sky-50"
             iconColor="text-sky-700"
           />
           <StatCard
-            title="Cloud Storage Footprint"
-            value={`${systemHealth.storageUsedGb} GB`}
-            subtitle={`of ${systemHealth.storageTotalGb} GB Allocated`}
+            title="Suspended Clinics"
+            value={allTenants.filter((t) => t.status !== 'active').length}
+            subtitle="Past due or manually suspended"
             icon={HardDrive}
             iconBgColor="bg-indigo-50"
             iconColor="text-indigo-700"
           />
           <StatCard
-            title="Platform Uptime SLA"
-            value={`${systemHealth.uptimePercent}%`}
-            subtitle="All services operational"
+            title="Platform Staff & Doctors"
+            value={allUsers.filter((u) => u.tenantId !== null).length}
+            subtitle={`${allUsers.filter((u) => u.role === 'DOCTOR_ADMIN').length} Doctor Admins`}
             icon={Activity}
             iconBgColor="bg-emerald-50"
             iconColor="text-emerald-700"

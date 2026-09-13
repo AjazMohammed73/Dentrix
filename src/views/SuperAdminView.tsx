@@ -49,7 +49,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
     assignDoctorAdmin,
     updateTenantSubscription,
   } = useAuth();
-  const { systemHealth, allServices, toggleServiceActive } = useData();
+  const { allServices, toggleServiceActive } = useData();
 
   const [resetPasswordTarget, setResetPasswordTarget] = useState<User | null>(null);
   const { rowClass, binClass, trigger: triggerDelete } = useEatenDelete<string>();
@@ -216,17 +216,17 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
           iconColor="text-amber-700"
         />
         <StatCard
-          title="DB Connection Pools"
-          value={`${systemHealth.databasePools.active}/${systemHealth.databasePools.max}`}
-          subtitle={`${systemHealth.databasePools.idle} Idle pools ready`}
+          title="Platform Staff & Doctors"
+          value={allUsers.filter((u) => u.tenantId !== null).length}
+          subtitle={`${allUsers.filter((u) => u.role === 'DOCTOR_ADMIN').length} Doctor Admins`}
           icon={Database}
           iconBgColor="bg-sky-50"
           iconColor="text-sky-700"
         />
         <StatCard
-          title="Platform High Availability"
-          value={`${systemHealth.uptimePercent}%`}
-          subtitle="Zero-downtime SLA"
+          title="Active Services Catalog"
+          value={allServices.filter((s) => s.isActive).length}
+          subtitle={`${allServices.length} Total Procedures Configured`}
           icon={Activity}
           iconBgColor="bg-indigo-50"
           iconColor="text-indigo-700"
