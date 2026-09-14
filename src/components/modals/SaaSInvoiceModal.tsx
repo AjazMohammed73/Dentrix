@@ -20,7 +20,7 @@ export const SaaSInvoiceModal: React.FC<SaaSInvoiceModalProps> = ({
     plan: tenant.plan || 'Professional',
     status: 'Active',
     billingCycle: 'Monthly',
-    monthlyFee: tenant.plan === 'Enterprise' ? 31999 : tenant.plan === 'Professional' ? 15999 : 7999,
+    monthlyFee: tenant.plan === 'Enterprise' ? 14999 : tenant.plan === 'Professional' ? 9999 : 4999,
     chairLimit: tenant.plan === 'Enterprise' ? 12 : tenant.plan === 'Professional' ? 6 : 2,
     renewalDate: '2025-01-15',
     autoRenew: true,

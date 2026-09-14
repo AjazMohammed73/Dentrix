@@ -26,9 +26,9 @@ SuperAdmin = Annotated[User, Depends(require_super_admin)]
 
 # (monthly fee in INR, chair limit) per plan
 _PLAN_DEFAULTS: dict[str, tuple[int, int]] = {
-    "Starter": (7999, 2),
-    "Professional": (15999, 6),
-    "Enterprise": (31999, 15),
+    "Starter": (4999, 2),
+    "Professional": (9999, 6),
+    "Enterprise": (14999, 15),
 }
 
 _DOCTOR_TITLE_HINTS = ("Doctor", "DDS", "DMD")

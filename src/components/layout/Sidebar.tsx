@@ -108,36 +108,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSi
       }`}
     >
       {/* Header & 3D Tooth Brand */}
-      <div className="h-20 py-2.5 flex items-center px-4 border-b border-border/80 justify-between overflow-hidden">
-        <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0">
-            <Tooth3D size={50} onClick={() => onNavigate('dashboard')} />
-          </div>
-          {!isCollapsed && (
-            <div className="flex flex-col">
-              <span className="font-extrabold text-xl tracking-tight text-slate-900 flex items-center gap-1.5">
-                Dentrix
-                <span className="text-[10px] uppercase font-bold tracking-widest bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded border border-primary-200">
-                  v2.0
-                </span>
-              </span>
-              <span className="text-xs text-slate-500 truncate max-w-[140px]">
-                {isSuperAdmin
-                  ? 'Cloud Network Console'
-                  : currentTenant?.name || 'Clinic Administration'}
-              </span>
+      <div className="border-b border-border/80 overflow-hidden">
+        <div className={`h-20 py-2.5 flex items-center px-4 ${isCollapsed ? 'justify-center' : ''}`}>
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0">
+              <Tooth3D size={50} onClick={() => onNavigate('dashboard')} />
             </div>
-          )}
+            {!isCollapsed && (
+              <div className="flex flex-col">
+                <span className="font-extrabold text-xl tracking-tight text-slate-900 flex items-center gap-1.5">
+                  Dentrix
+                  <span className="text-[10px] uppercase font-bold tracking-widest bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded border border-primary-200">
+                    v2.0
+                  </span>
+                </span>
+                <span className="text-xs text-slate-500 truncate max-w-[140px]">
+                  {isSuperAdmin
+                    ? 'Cloud Network Console'
+                    : currentTenant?.name || 'Clinic Administration'}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Collapse Toggle */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-surface-100 rounded-lg transition-colors"
-          title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-        >
-          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
+        {/* Collapse Toggle — its own row below the logo, so it has room to be a real target */}
+        <div className={`flex px-3 pb-2.5 ${isCollapsed ? 'justify-center' : 'justify-end'}`}>
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-surface-100 rounded-lg transition-colors border border-transparent hover:border-border"
+            title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Tenant Indicator Chip */}

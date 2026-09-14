@@ -28,6 +28,9 @@ interface LandingPageViewProps {
   onOpenSignIn: () => void;
 }
 
+// Demo requests and contact go straight to WhatsApp — no backend needed.
+const DEMO_WHATSAPP_NUMBER = '917671008064';
+
 export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, onOpenSignIn }) => {
   const { isAuthenticated, currentUser } = useAuth();
   const [activeFeatureTab, setActiveFeatureTab] = useState<'scheduling' | 'odontogram' | 'billing' | 'admin'>('scheduling');
@@ -45,6 +48,18 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
 
   const handleDemoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const message =
+      `*New Dentrix Demo Request*\n` +
+      `Clinic: ${demoForm.clinicName}\n` +
+      `Doctor/Admin: ${demoForm.doctorName}\n` +
+      `Email: ${demoForm.email}\n` +
+      `Phone: ${demoForm.phone}\n` +
+      `Chairs: ${demoForm.chairCount}`;
+    window.open(
+      `https://api.whatsapp.com/send?phone=${DEMO_WHATSAPP_NUMBER}&text=${encodeURIComponent(message)}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
     setDemoSubmitted(true);
     setTimeout(() => {
       setDemoSubmitted(false);
@@ -515,11 +530,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <span className="text-xs font-bold text-slate-900 block">Active Subscriptions</span>
                 <div className="flex items-center justify-between text-xs p-3 bg-surface-50 rounded-xl border">
                   <span className="font-semibold">Apex Dental Studio</span>
-                  <span className="font-bold text-emerald-700">₹31,999/mo (Enterprise)</span>
+                  <span className="font-bold text-emerald-700">₹14,999/mo (Enterprise)</span>
                 </div>
                 <div className="flex items-center justify-between text-xs p-3 bg-surface-50 rounded-xl border">
                   <span className="font-semibold">Radiant Smile Dental</span>
-                  <span className="font-bold text-primary-700">₹15,999/mo (Professional)</span>
+                  <span className="font-bold text-primary-700">₹9,999/mo (Professional)</span>
                 </div>
               </div>
             </div>
@@ -549,8 +564,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Solo / Starter</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Starter Clinic</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900">₹7,999</span>
-                  <span className="text-xs text-slate-500">/month</span>
+                  <span className="text-4xl font-black text-slate-900">₹4,999</span>
+                  <span className="text-xs text-slate-500">+ GST /month</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-2">Perfect for single-doctor boutique dental practices.</p>
 
@@ -588,8 +603,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <span className="text-xs font-bold uppercase tracking-wider text-primary-600">Growing Practice</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Professional</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900">₹15,999</span>
-                  <span className="text-xs text-slate-500">/month</span>
+                  <span className="text-4xl font-black text-slate-900">₹9,999</span>
+                  <span className="text-xs text-slate-500">+ GST /month</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-2">Comprehensive practice operating system for 3–6 chairs.</p>
 
@@ -626,8 +641,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Multi-Location</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Enterprise</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900">₹31,999</span>
-                  <span className="text-xs text-slate-500">/month</span>
+                  <span className="text-4xl font-black text-slate-900">₹14,999</span>
+                  <span className="text-xs text-slate-500">+ GST /month</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-2">For multi-clinic networks and dental hospital franchises.</p>
 
@@ -837,7 +852,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
             <span className="font-bold text-sm block mb-3 text-slate-200">Contact & Support</span>
             <p className="text-slate-400">24/7 Practice Concierge</p>
             <p className="text-slate-300 font-mono mt-1">support@dentrix.axiotronicx.io</p>
-            <p className="text-slate-400 mt-2">1-800-DENTRIX-OS</p>
+            <a
+              href={`https://api.whatsapp.com/send?phone=${DEMO_WHATSAPP_NUMBER}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-300 hover:text-white font-mono mt-2 block"
+            >
+              WhatsApp: +91 76710 08064
+            </a>
           </div>
         </div>
 
@@ -871,9 +893,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
                   <CheckCircle2 size={28} />
                 </div>
-                <h4 className="text-base font-bold text-slate-900">Demo Scheduled!</h4>
+                <h4 className="text-base font-bold text-slate-900">Opening WhatsApp…</h4>
                 <p className="text-xs text-slate-600">
-                  Our clinical specialist will reach out to <strong>{demoForm.email}</strong> within 15 minutes.
+                  We've pre-filled your details — just hit send and our team will reply shortly.
                 </p>
               </div>
             ) : (
@@ -944,14 +966,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md shadow-primary-600/25 transition-all"
+                    className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-md shadow-primary-600/25 transition-all flex items-center justify-center gap-2"
                   >
-                    Confirm Live Demo
+                    <Phone size={14} /> Send via WhatsApp
                   </button>
                 </div>
 
                 <p className="text-[10px] text-slate-400 text-center">
-                  ⚡ Powered by Axiotronicx.Inc • No credit card required.
+                  ⚡ Opens WhatsApp with your details pre-filled • No credit card required.
                 </p>
               </form>
             )}

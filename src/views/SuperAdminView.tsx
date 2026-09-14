@@ -81,7 +81,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
     plan: 'Professional',
     status: 'Active',
     billingCycle: 'Monthly',
-    monthlyFee: 199,
+    monthlyFee: 9999,
     chairLimit: 6,
     renewalDate: '2025-01-01',
     autoRenew: true,
@@ -94,7 +94,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
   // Calculations for Subscription Analytics
   const totalMRR = allTenants
     .filter((t) => t.status === 'active')
-    .reduce((sum, t) => sum + (t.subscription?.monthlyFee || (t.plan === 'Enterprise' ? 399 : t.plan === 'Professional' ? 199 : 99)), 0);
+    .reduce((sum, t) => sum + (t.subscription?.monthlyFee || (t.plan === 'Enterprise' ? 14999 : t.plan === 'Professional' ? 9999 : 4999)), 0);
 
   const totalARR = totalMRR * 12;
 
@@ -106,7 +106,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
         plan: tenant.plan || 'Professional',
         status: tenant.status === 'active' ? 'Active' : 'Past Due',
         billingCycle: 'Monthly',
-        monthlyFee: tenant.plan === 'Enterprise' ? 399 : tenant.plan === 'Professional' ? 199 : 99,
+        monthlyFee: tenant.plan === 'Enterprise' ? 14999 : tenant.plan === 'Professional' ? 9999 : 4999,
         chairLimit: tenant.plan === 'Enterprise' ? 12 : tenant.plan === 'Professional' ? 6 : 2,
         renewalDate: '2025-06-30',
         autoRenew: true,
@@ -312,7 +312,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
                     plan: tenant.plan,
                     status: tenant.status === 'active' ? 'Active' : 'Past Due',
                     billingCycle: 'Monthly',
-                    monthlyFee: tenant.plan === 'Enterprise' ? 31999 : tenant.plan === 'Professional' ? 15999 : 7999,
+                    monthlyFee: tenant.plan === 'Enterprise' ? 14999 : tenant.plan === 'Professional' ? 9999 : 4999,
                     chairLimit: tenant.plan === 'Enterprise' ? 12 : tenant.plan === 'Professional' ? 6 : 2,
                     renewalDate: '2025-06-30',
                     autoRenew: true,
@@ -824,15 +824,15 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
                       setSubFormData({
                         ...subFormData,
                         plan: e.target.value as any,
-                        monthlyFee: e.target.value === 'Starter' ? 7999 : e.target.value === 'Professional' ? 15999 : 31999,
+                        monthlyFee: e.target.value === 'Starter' ? 4999 : e.target.value === 'Professional' ? 9999 : 14999,
                         chairLimit: e.target.value === 'Starter' ? 2 : e.target.value === 'Professional' ? 6 : 15,
                       })
                     }
                     className="w-full bg-surface-50 border border-border rounded-xl px-3 py-2 font-bold text-slate-800"
                   >
-                    <option value="Starter">Starter (₹7,999/mo)</option>
-                    <option value="Professional">Professional (₹15,999/mo)</option>
-                    <option value="Enterprise">Enterprise (₹31,999/mo)</option>
+                    <option value="Starter">Starter (₹4,999/mo)</option>
+                    <option value="Professional">Professional (₹9,999/mo)</option>
+                    <option value="Enterprise">Enterprise (₹14,999/mo)</option>
                   </select>
                 </div>
 

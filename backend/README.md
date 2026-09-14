@@ -99,6 +99,21 @@ filtered to the caller's tenant; Super Admin sees all. Writes are locked to the 
 tenant. Booking an appointment auto-creates its pending invoice and updates the patient
 balance in the same transaction. Clinical notes and payment installments are append-only.
 
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Covers password hashing/JWT (`security.py`), the rate limiter, and the authorization
+logic added this project (permission checks, tenant scoping, privilege-escalation
+guards in `users.py`) — all pure Python, no database needed; `tests/conftest.py`
+forces dummy `DATABASE_URL`/`JWT_SECRET` so the suite can never touch the real Neon
+database. There's no integration/API-level test yet (would need a disposable Postgres
+— a second Neon branch works well); add `tests/test_api.py` with a `TEST_DATABASE_URL`-gated
+fixture when one's available.
+
 ## Deploy (Render)
 
 - **Web Service**, root directory `backend/`, plan **Starter** (free spins down).
