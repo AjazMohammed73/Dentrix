@@ -60,7 +60,7 @@ def main() -> None:
                 "plan": "Professional",
                 "status": "Active",
                 "billingCycle": "Monthly",
-                "monthlyFee": 9999,
+                "monthlyFee": 7999,
                 "chairLimit": 6,
                 "renewalDate": (date.today() + timedelta(days=30)).isoformat(),
                 "autoRenew": True,

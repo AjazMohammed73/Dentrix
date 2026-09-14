@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Tooth3D } from '../components/layout/Tooth3DLazy';
 import { useAuth } from '../context/AuthContext';
+import { formatINR } from '../utils/format';
 
 interface LandingPageViewProps {
   onLaunchApp: () => void;
@@ -31,10 +32,26 @@ interface LandingPageViewProps {
 // Demo requests and contact go straight to WhatsApp — no backend needed.
 const DEMO_WHATSAPP_NUMBER = '917671008064';
 
+type BillingCycle = 'monthly' | 'sixMonth' | 'yearly';
+
+const CYCLE_LABEL: Record<BillingCycle, string> = {
+  monthly: '/month',
+  sixMonth: '/6 months',
+  yearly: '/year',
+};
+
+// Bundle prices are flat totals for the period (not monthly rate x months) — they're
+// already discounted, hence the per-month equivalent shown alongside.
+const PLAN_PRICING: Record<'starter' | 'professional', Record<BillingCycle, number>> = {
+  starter: { monthly: 2999, sixMonth: 15000, yearly: 30000 },
+  professional: { monthly: 7999, sixMonth: 45000, yearly: 90000 },
+};
+
 export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, onOpenSignIn }) => {
   const { isAuthenticated, currentUser } = useAuth();
   const [activeFeatureTab, setActiveFeatureTab] = useState<'scheduling' | 'odontogram' | 'billing' | 'admin'>('scheduling');
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [demoSubmitted, setDemoSubmitted] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
@@ -530,11 +547,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <span className="text-xs font-bold text-slate-900 block">Active Subscriptions</span>
                 <div className="flex items-center justify-between text-xs p-3 bg-surface-50 rounded-xl border">
                   <span className="font-semibold">Apex Dental Studio</span>
-                  <span className="font-bold text-emerald-700">₹14,999/mo (Enterprise)</span>
+                  <span className="font-bold text-emerald-700">₹11,999/mo (Enterprise)</span>
                 </div>
                 <div className="flex items-center justify-between text-xs p-3 bg-surface-50 rounded-xl border">
                   <span className="font-semibold">Radiant Smile Dental</span>
-                  <span className="font-bold text-primary-700">₹9,999/mo (Professional)</span>
+                  <span className="font-bold text-primary-700">₹7,999/mo (Professional)</span>
                 </div>
               </div>
             </div>
@@ -557,6 +574,31 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
             </p>
           </div>
 
+          {/* Billing Cycle Toggle */}
+          <div className="flex justify-center mb-10">
+            <div className="inline-flex items-center gap-1 bg-white p-1.5 rounded-2xl border border-border shadow-sm">
+              {(
+                [
+                  { id: 'monthly', label: 'Monthly' },
+                  { id: 'sixMonth', label: '6 Months' },
+                  { id: 'yearly', label: '12 Months' },
+                ] as { id: BillingCycle; label: string }[]
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setBillingCycle(opt.id)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    billingCycle === opt.id
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {/* Starter Plan */}
             <div className="bg-white rounded-3xl p-8 border border-border shadow-sm flex flex-col justify-between hover:shadow-elevation-2 transition-all">
@@ -564,9 +606,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Solo / Starter</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Starter Clinic</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900">₹4,999</span>
-                  <span className="text-xs text-slate-500">+ GST /month</span>
+                  <span className="text-4xl font-black text-slate-900">{formatINR(PLAN_PRICING.starter[billingCycle])}</span>
+                  <span className="text-xs text-slate-500">+ GST {CYCLE_LABEL[billingCycle]}</span>
                 </div>
+                {billingCycle !== 'monthly' && (
+                  <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                    {formatINR(Math.round(PLAN_PRICING.starter[billingCycle] / (billingCycle === 'sixMonth' ? 6 : 12)))}/month effective
+                  </p>
+                )}
                 <p className="text-xs text-slate-500 mt-2">Perfect for single-doctor boutique dental practices.</p>
 
                 <ul className="mt-6 space-y-3 text-xs text-slate-700">
@@ -586,10 +633,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
               </div>
 
               <button
-                onClick={onLaunchApp}
+                onClick={() => setIsDemoModalOpen(true)}
                 className="mt-8 w-full py-3 rounded-2xl bg-surface-100 hover:bg-surface-200 text-slate-800 text-xs font-extrabold transition-all"
               >
-                Choose Starter
+                Contact Us
               </button>
             </div>
 
@@ -603,9 +650,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <span className="text-xs font-bold uppercase tracking-wider text-primary-600">Growing Practice</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Professional</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900">₹9,999</span>
-                  <span className="text-xs text-slate-500">+ GST /month</span>
+                  <span className="text-4xl font-black text-slate-900">{formatINR(PLAN_PRICING.professional[billingCycle])}</span>
+                  <span className="text-xs text-slate-500">+ GST {CYCLE_LABEL[billingCycle]}</span>
                 </div>
+                {billingCycle !== 'monthly' && (
+                  <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                    {formatINR(Math.round(PLAN_PRICING.professional[billingCycle] / (billingCycle === 'sixMonth' ? 6 : 12)))}/month effective
+                  </p>
+                )}
                 <p className="text-xs text-slate-500 mt-2">Comprehensive practice operating system for 3–6 chairs.</p>
 
                 <ul className="mt-6 space-y-3 text-xs text-slate-700">
@@ -628,10 +680,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
               </div>
 
               <button
-                onClick={onLaunchApp}
+                onClick={() => setIsDemoModalOpen(true)}
                 className="mt-8 w-full py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-extrabold shadow-md shadow-primary-600/30 transition-all"
               >
-                Choose Professional
+                Contact Us
               </button>
             </div>
 
@@ -641,7 +693,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Multi-Location</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Enterprise</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900">₹14,999</span>
+                  <span className="text-4xl font-black text-slate-900">₹11,999</span>
                   <span className="text-xs text-slate-500">+ GST /month</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-2">For multi-clinic networks and dental hospital franchises.</p>
@@ -663,10 +715,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
               </div>
 
               <button
-                onClick={onLaunchApp}
+                onClick={() => setIsDemoModalOpen(true)}
                 className="mt-8 w-full py-3 rounded-2xl bg-surface-100 hover:bg-surface-200 text-slate-800 text-xs font-extrabold transition-all"
               >
-                Choose Enterprise
+                Contact Us
               </button>
             </div>
           </div>

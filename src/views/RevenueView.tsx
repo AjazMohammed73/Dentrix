@@ -93,7 +93,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
     plan: 'Enterprise',
     status: 'Active',
     billingCycle: 'Annual',
-    monthlyFee: 14999,
+    monthlyFee: 11999,
     chairLimit: 12,
     renewalDate: '2025-01-15',
     autoRenew: true,
@@ -292,7 +292,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
     (sum, t) =>
       sum +
       (t.subscription?.monthlyFee ||
-        (t.plan === 'Enterprise' ? 14999 : t.plan === 'Professional' ? 9999 : 4999)),
+        (t.plan === 'Enterprise' ? 11999 : t.plan === 'Professional' ? 7999 : 2999)),
     0
   );
   const totalARR = totalMRR * 12;
@@ -330,7 +330,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
         status: tenant.status === 'active' ? 'Active' : 'Past Due',
         billingCycle: 'Monthly',
         monthlyFee:
-          tenant.plan === 'Enterprise' ? 14999 : tenant.plan === 'Professional' ? 9999 : 4999,
+          tenant.plan === 'Enterprise' ? 11999 : tenant.plan === 'Professional' ? 7999 : 2999,
         chairLimit: tenant.plan === 'Enterprise' ? 12 : tenant.plan === 'Professional' ? 6 : 2,
         renewalDate: '2025-06-30',
         autoRenew: true,
@@ -386,7 +386,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
         s?.plan || t.plan,
         s?.chairLimit || (t.plan === 'Enterprise' ? 12 : 6),
         s?.billingCycle || 'Monthly',
-        s?.monthlyFee || (t.plan === 'Enterprise' ? 14999 : 9999),
+        s?.monthlyFee || (t.plan === 'Enterprise' ? 11999 : 7999),
         s?.renewalDate || '2025-01-15',
         s?.autoRenew ? 'Enabled' : 'Disabled',
         s?.status || (t.status === 'active' ? 'Active' : 'Past Due'),
@@ -588,7 +588,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                   {/* Enterprise */}
                   <div className="p-3.5 bg-purple-50/60 rounded-2xl border border-purple-100 space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-purple-900">Enterprise Plan (₹14,999/mo)</span>
+                      <span className="text-purple-900">Enterprise Plan (₹11,999/mo)</span>
                       <span className="text-purple-700 bg-purple-100 px-2 py-0.5 rounded-lg">
                         {enterpriseCount} {enterpriseCount === 1 ? 'Clinic' : 'Clinics'}
                       </span>
@@ -601,7 +601,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                   {/* Professional */}
                   <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-100 space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-blue-900">Professional Plan (₹9,999/mo)</span>
+                      <span className="text-blue-900">Professional Plan (₹7,999/mo)</span>
                       <span className="text-blue-700 bg-blue-100 px-2 py-0.5 rounded-lg">
                         {professionalCount} {professionalCount === 1 ? 'Clinic' : 'Clinics'}
                       </span>
@@ -614,7 +614,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                   {/* Starter */}
                   <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-slate-800">Starter Plan (₹4,999/mo)</span>
+                      <span className="text-slate-800">Starter Plan (₹2,999/mo)</span>
                       <span className="text-slate-600 bg-slate-200 px-2 py-0.5 rounded-lg">
                         {starterCount} {starterCount === 1 ? 'Clinic' : 'Clinics'}
                       </span>
@@ -727,7 +727,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                       const status = sub?.status || (t.status === 'active' ? 'Active' : 'Past Due');
                       const fee =
                         sub?.monthlyFee ||
-                        (plan === 'Enterprise' ? 14999 : plan === 'Professional' ? 9999 : 4999);
+                        (plan === 'Enterprise' ? 11999 : plan === 'Professional' ? 7999 : 2999);
                       const chairs = sub?.chairLimit || (plan === 'Enterprise' ? 12 : 6);
                       const cycle = sub?.billingCycle || 'Monthly';
                       const renewalDate = sub?.renewalDate || '2025-06-30';
@@ -1779,19 +1779,19 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                         plan: newPlan,
                         monthlyFee:
                           newPlan === 'Enterprise'
-                            ? 14999
+                            ? 11999
                             : newPlan === 'Professional'
-                            ? 9999
-                            : 4999,
+                            ? 7999
+                            : 2999,
                         chairLimit:
                           newPlan === 'Enterprise' ? 12 : newPlan === 'Professional' ? 6 : 2,
                       });
                     }}
                     className="w-full px-3.5 py-2.5 bg-surface-50 border border-border rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-primary-600"
                   >
-                    <option value="Enterprise">Enterprise (₹14,999/mo)</option>
-                    <option value="Professional">Professional (₹9,999/mo)</option>
-                    <option value="Starter">Starter (₹4,999/mo)</option>
+                    <option value="Enterprise">Enterprise (₹11,999/mo)</option>
+                    <option value="Professional">Professional (₹7,999/mo)</option>
+                    <option value="Starter">Starter (₹2,999/mo)</option>
                   </select>
                 </div>
 
@@ -1824,7 +1824,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
                       setSubForm({ ...subForm, monthlyFee: Number(val) });
                     }}
                     className="w-full px-3.5 py-2.5 bg-surface-50 border border-border rounded-xl text-xs font-bold font-mono text-slate-900 focus:outline-none focus:border-primary-600"
-                    placeholder="e.g. 9999"
+                    placeholder="e.g. 7999"
                   />
                 </div>
 
