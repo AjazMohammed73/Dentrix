@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ShieldAlert,
   LogOut,
+  X,
 } from 'lucide-react';
 import { Tooth3D } from './Tooth3DLazy';
 import { useAuth } from '../../context/AuthContext';
@@ -30,9 +31,17 @@ interface SidebarProps {
   currentRoute: NavRoute;
   onNavigate: (route: NavRoute) => void;
   onSignOut?: () => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSignOut }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  currentRoute,
+  onNavigate,
+  onSignOut,
+  isMobileOpen = false,
+  onCloseMobile = () => {},
+}) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { currentUser, currentTenant, logout } = useAuth();
   const { appointments, patients } = useData();
@@ -102,38 +111,54 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSi
   ];
 
   return (
-    <aside
-      className={`relative flex flex-col bg-white border-r border-border transition-all duration-300 z-30 select-none ${
-        isCollapsed ? 'w-20' : 'w-64'
-      }`}
-    >
+    <>
+      {/* Mobile backdrop — tap to close the off-canvas drawer */}
+      {isMobileOpen && (
+        <div
+          onClick={onCloseMobile}
+          className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 lg:relative flex flex-col bg-white border-r border-border transition-transform lg:transition-all duration-300 z-50 lg:z-30 select-none w-64 ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0 ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}
+      >
       {/* Header & 3D Tooth Brand */}
       <div className="border-b border-border/80 overflow-hidden">
-        <div className={`h-20 py-2.5 flex items-center px-4 ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="flex items-center space-x-3">
+        <div className={`h-20 py-2.5 flex items-center px-4 justify-between ${isCollapsed ? 'lg:justify-center' : ''}`}>
+          <div className="flex items-center space-x-3 min-w-0">
             <div className="flex-shrink-0">
               <Tooth3D size={50} onClick={() => onNavigate('dashboard')} />
             </div>
-            {!isCollapsed && (
-              <div className="flex flex-col">
-                <span className="font-extrabold text-xl tracking-tight text-slate-900 flex items-center gap-1.5">
-                  Dentrix
-                  <span className="text-[10px] uppercase font-bold tracking-widest bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded border border-primary-200">
-                    v2.0
-                  </span>
+            <div className={`flex-col min-w-0 ${isCollapsed ? 'flex lg:hidden' : 'flex'}`}>
+              <span className="font-extrabold text-xl tracking-tight text-slate-900 flex items-center gap-1.5">
+                Dentrix
+                <span className="text-[10px] uppercase font-bold tracking-widest bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded border border-primary-200">
+                  v2.0
                 </span>
-                <span className="text-xs text-slate-500 truncate max-w-[140px]">
-                  {isSuperAdmin
-                    ? 'Cloud Network Console'
-                    : currentTenant?.name || 'Clinic Administration'}
-                </span>
-              </div>
-            )}
+              </span>
+              <span className="text-xs text-slate-500 truncate max-w-[140px]">
+                {isSuperAdmin
+                  ? 'Cloud Network Console'
+                  : currentTenant?.name || 'Clinic Administration'}
+              </span>
+            </div>
           </div>
+
+          {/* Mobile-only close button */}
+          <button
+            onClick={onCloseMobile}
+            className="lg:hidden p-2 text-slate-400 hover:text-slate-700 hover:bg-surface-100 rounded-lg transition-colors flex-shrink-0"
+            title="Close menu"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Collapse Toggle — its own row below the logo, so it has room to be a real target */}
-        <div className={`flex px-3 pb-2.5 ${isCollapsed ? 'justify-center' : 'justify-end'}`}>
+        {/* Collapse Toggle — desktop only; mobile drawer is just open/closed */}
+        <div className={`hidden lg:flex px-3 pb-2.5 ${isCollapsed ? 'justify-center' : 'justify-end'}`}>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-2 text-slate-400 hover:text-slate-700 hover:bg-surface-100 rounded-lg transition-colors border border-transparent hover:border-border"
@@ -177,7 +202,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSi
             return (
               <button
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                onClick={() => {
+                  onNavigate(item.id);
+                  onCloseMobile();
+                }}
                 className={`w-full flex items-center rounded-xl transition-all duration-200 group text-sm font-medium ${
                   isActive
                     ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
@@ -269,6 +297,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate, onSi
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 };

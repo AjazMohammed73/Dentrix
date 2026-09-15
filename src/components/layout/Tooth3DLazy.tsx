@@ -13,7 +13,7 @@ const Tooth3DImpl = lazy(() => import('./Tooth3D').then((m) => ({ default: m.Too
 const ToothFallback: React.FC<Tooth3DProps> = ({ onClick, size = 50 }) => (
   <div
     onClick={onClick}
-    className="relative flex items-center justify-center cursor-pointer rounded-full bg-primary-600/10"
+    className={`relative flex items-center justify-center rounded-full bg-primary-600/10 ${onClick ? 'cursor-pointer' : ''}`}
     style={{ width: size, height: size }}
   >
     <span style={{ fontSize: size * 0.55 }}>🦷</span>

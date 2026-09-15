@@ -9,6 +9,7 @@ import {
   FileText,
   Lock,
   Database,
+  Menu,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AuditLogModal } from '../modals/AuditLogModal';
@@ -22,6 +23,7 @@ interface TopHeaderProps {
   onNavigate?: (route: any) => void;
   onLockWorkstation?: () => void;
   onOpenBackup?: () => void;
+  onOpenMobileMenu?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -32,6 +34,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onNavigate = () => {},
   onLockWorkstation,
   onOpenBackup,
+  onOpenMobileMenu,
 }) => {
   const { currentUser, currentTenant, logout } = useAuth();
 
@@ -54,9 +57,19 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   }, []);
 
   return (
-    <header className="h-16 bg-white border-b border-border px-6 flex items-center justify-between z-20 sticky top-0 shadow-sm">
-      {/* Left: Clinic identity & search */}
-      <div className="flex items-center space-x-4 flex-1 max-w-xl">
+    <header className="h-16 bg-white border-b border-border px-3 sm:px-6 flex items-center justify-between gap-2 z-20 sticky top-0 shadow-sm">
+      {/* Left: Mobile menu, clinic identity & search */}
+      <div className="flex items-center space-x-2 sm:space-x-4 flex-1 min-w-0 max-w-xl">
+        {onOpenMobileMenu && (
+          <button
+            type="button"
+            onClick={onOpenMobileMenu}
+            className="lg:hidden p-2 -ml-1 text-slate-500 hover:text-slate-800 hover:bg-surface-100 rounded-xl transition-colors flex-shrink-0"
+            title="Open menu"
+          >
+            <Menu size={20} />
+          </button>
+        )}
         {isSuperAdmin ? (
           <div className="flex items-center space-x-2 bg-amber-50 border border-amber-200/80 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-900 shadow-sm">
             <Sparkles size={14} className="text-amber-600 flex-shrink-0" />

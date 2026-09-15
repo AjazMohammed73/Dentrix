@@ -114,20 +114,20 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
 
       {/* Navigation Bar (Petpooja style) */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-border transition-all">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          {/* Brand */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={onLaunchApp}>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-20 flex items-center justify-between gap-2">
+          {/* Brand (decorative — not a link) */}
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-shrink">
             <div className="flex-shrink-0">
-              <Tooth3D size={48} onClick={onLaunchApp} />
+              <Tooth3D size={40} />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-2xl font-black tracking-tight text-slate-900">Dentrix</span>
-                <span className="text-[10px] font-extrabold uppercase bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded border border-primary-200">
+                <span className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 truncate">Dentrix</span>
+                <span className="hidden sm:inline text-[10px] font-extrabold uppercase bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded border border-primary-200 flex-shrink-0">
                   OS
                 </span>
               </div>
-              <span className="text-[10px] font-bold tracking-wider text-slate-400 block uppercase">
+              <span className="hidden sm:block text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                 Powered by Axiotronicx.Inc
               </span>
             </div>
@@ -142,7 +142,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
           </nav>
 
           {/* Action CTAs */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 flex-shrink-0">
             <button
               onClick={() => setIsDemoModalOpen(true)}
               className="hidden sm:flex items-center space-x-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-700 border border-slate-200 hover:bg-surface-100 transition-all"
@@ -154,10 +154,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
             {!isAuthenticated ? (
               <button
                 onClick={onOpenSignIn}
-                className="flex items-center space-x-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 transition-all shadow-sm"
+                aria-label="Sign In"
+                className="flex items-center space-x-1.5 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 transition-all shadow-sm"
               >
                 <LogIn size={14} />
-                <span>Sign In</span>
+                <span className="hidden sm:inline">Sign In</span>
               </button>
             ) : (
               <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-surface-100 border border-slate-200 text-xs">
@@ -168,9 +169,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
 
             <button
               onClick={onLaunchApp}
-              className="flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-2xl text-xs font-extrabold shadow-md shadow-primary-600/25 hover:shadow-glow-royal transition-all active:scale-95"
-            >
-              <span>{isAuthenticated ? 'Open Workspace' : 'Launch Clinic App'}</span>
+              className="flex items-center space-x-1.5 sm:space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl text-xs font-extrabold shadow-md shadow-primary-600/25 hover:shadow-glow-royal transition-all active:scale-95 whitespace-nowrap">
+              <span className="sm:hidden">{isAuthenticated ? 'Open' : 'Launch'}</span>
+              <span className="hidden sm:inline">{isAuthenticated ? 'Open Workspace' : 'Launch Clinic App'}</span>
               <ArrowRight size={15} />
             </button>
           </div>
@@ -692,11 +693,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp, o
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Multi-Location</span>
                 <h3 className="text-xl font-bold text-slate-900 mt-1">Enterprise</h3>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900">₹11,999</span>
-                  <span className="text-xs text-slate-500">+ GST /month</span>
+                <div className="mt-4">
+                  <span className="text-2xl font-black text-slate-900">Custom Pricing</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-2">For multi-clinic networks and dental hospital franchises.</p>
+                <p className="text-xs text-slate-500 mt-2">Contact us for pricing details — tailored to multi-clinic networks and dental hospital franchises.</p>
 
                 <ul className="mt-6 space-y-3 text-xs text-slate-700">
                   <li className="flex items-center gap-2">

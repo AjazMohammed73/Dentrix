@@ -234,7 +234,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex items-center space-x-2 border-b border-border bg-white px-6 pt-3 rounded-t-3xl border-t border-x">
+      <div className="flex items-center space-x-2 border-b border-border bg-white px-6 pt-3 rounded-t-3xl border-t border-x overflow-x-auto">
         {[
           { id: 'tenants', label: 'Clinics & Subscriptions', icon: Building2, count: allTenants.length },
           { id: 'users', label: 'Global User Access', icon: Users, count: allUsers.length },
@@ -247,7 +247,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({ onOpenOnboardMod
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center space-x-2 px-4 py-3 text-xs font-bold transition-all border-b-2 ${
+              className={`flex items-center space-x-2 px-4 py-3 text-xs font-bold transition-all border-b-2 flex-shrink-0 whitespace-nowrap ${
                 isActive
                   ? 'border-amber-600 text-amber-700'
                   : 'border-transparent text-slate-500 hover:text-slate-900'

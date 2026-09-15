@@ -39,6 +39,7 @@ const AppContent: React.FC = () => {
   const [isSignInOpen, setIsSignInOpen] = useState<boolean>(false);
   const [currentRoute, setCurrentRoute] = useState<NavRoute>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Modals state
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
@@ -174,11 +175,13 @@ const AppContent: React.FC = () => {
   return (
     <DataProvider>
       <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] text-slate-800">
-        {/* Persistent Left Sidebar */}
+        {/* Persistent Left Sidebar (off-canvas drawer on mobile) */}
         <Sidebar
           currentRoute={currentRoute}
           onNavigate={handleNavigate}
           onSignOut={handleSignOut}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
         {/* Main Container */}
@@ -188,6 +191,7 @@ const AppContent: React.FC = () => {
             onQuickBook={handleQuickBook}
             onOpenCreateInvoice={() => handleOpenCreateInvoice()}
             onSignOut={handleSignOut}
+            onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
           />
 
           {/* Dynamic Route Content */}

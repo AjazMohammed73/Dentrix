@@ -248,8 +248,10 @@ export const Tooth3D: React.FC<Tooth3DProps> = ({ onClick, size = 50 }) => {
     <div
       ref={mountRef}
       onClick={onClick}
-      className="relative flex items-center justify-center cursor-pointer transition-transform duration-300 hover:scale-110 active:scale-95 group"
-      title="Dentrix Home / Dashboard"
+      className={`relative flex items-center justify-center transition-transform duration-300 group ${
+        onClick ? 'cursor-pointer hover:scale-110 active:scale-95' : ''
+      }`}
+      title={onClick ? 'Dentrix Home / Dashboard' : undefined}
       style={{ width: size, height: size }}
     >
       {/* Radiant Royal Blue glowing under-shadow and aura behind the tooth */}

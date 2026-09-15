@@ -427,10 +427,10 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
             </div>
           </div>
 
-          <div className="flex bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700/80">
+          <div className="flex bg-slate-800/90 p-1.5 rounded-2xl border border-slate-700/80 overflow-x-auto max-w-full">
             <button
               onClick={() => setSuperAdminTab('subscriptions')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all flex-shrink-0 whitespace-nowrap ${
                 superAdminTab === 'subscriptions'
                   ? 'bg-primary-600 text-white shadow-md shadow-primary-600/30'
                   : 'text-slate-400 hover:text-white'
@@ -441,7 +441,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
             </button>
             <button
               onClick={() => setSuperAdminTab('invoices')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all flex-shrink-0 whitespace-nowrap ${
                 superAdminTab === 'invoices'
                   ? 'bg-primary-600 text-white shadow-md shadow-primary-600/30'
                   : 'text-slate-400 hover:text-white'
@@ -870,10 +870,10 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
             </div>
 
             {/* Sub-Tab Switcher Pills */}
-            <div className="flex items-center space-x-2 bg-surface-50 p-1.5 rounded-2xl border border-border w-fit">
+            <div className="flex items-center space-x-2 bg-surface-50 p-1.5 rounded-2xl border border-border w-fit max-w-full overflow-x-auto">
               <button
                 onClick={() => setClinicSubTab('invoices')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all flex-shrink-0 whitespace-nowrap ${
                   clinicSubTab === 'invoices'
                     ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
                     : 'text-slate-500 hover:text-slate-900'
@@ -887,7 +887,7 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ onNavigateHome }) => {
               </button>
               <button
                 onClick={() => setClinicSubTab('insurance')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all flex-shrink-0 whitespace-nowrap ${
                   clinicSubTab === 'insurance'
                     ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
                     : 'text-slate-500 hover:text-slate-900'
